@@ -20,6 +20,7 @@ object DecisionTree {
         nums.foreach(println)
         println("--nums size--"+nums.size)
         
+        
         val numBins = 5  // B bins for Update procedure
         var histo = updatePro(nums, numBins)
         
@@ -34,7 +35,9 @@ object DecisionTree {
         println(sumTest)
         println(iTest)
         
-        
+ 
+        var u = uniformPro(histo, 3, nums.size)
+        u.foreach(println)
       }
  }
  
@@ -100,7 +103,36 @@ object DecisionTree {
     result
   }
    
-   
+   // Uniform Procedure
+  def uniformPro(histo: ArrayBuffer[Array[Double]], numSplit:Int, numSize:Int): Array[Double]={
+       var u = new Array[Double](numSplit-1)
+      
+       for(j<-1 to numSplit-1){
+         var s = j*numSize/numSplit.toDouble
+         
+         var i= 0
+         var sumP = 0.0
+         // Sum Procedure
+         while (sumP<s){
+           if (i==0)
+             sumP += histo(i)(1)/2
+           else 
+             sumP += histo(i)(1)/2 + histo(i-1)(1)/2
+           i+=1
+         }
+         i-=2
+         
+         var d = s-(sumP-histo(i+1)(1)/2-histo(i)(1)/2)
+         var a = histo(i+1)(1)-histo(i)(1)
+         var b = 2*histo(i)(1)
+         var c = -2*d
+         var z = if (a ==0 ) -c/b else (-b+sqrt(pow(b,2)-4*a*c))/(2*a)
+         
+         u(j-1) = histo(i)(0)+(histo(i+1)(0)-histo(i)(0))*z
+         println("u("+j+")="+u(j-1))
+       }
+       u
+  }
  
  
 }
