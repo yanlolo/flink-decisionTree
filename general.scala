@@ -10,15 +10,12 @@ object DecisionTree {
     val source = Source.fromFile("d:/Userfiles/yyan/Desktop/data/test.txt")
     val lines = source.getLines
 
-    var i = 0
-    var histoA = ArrayBuffer[Array[Double]]()
-    var histoB = ArrayBuffer[Array[Double]]()
+    var histoList = ArrayBuffer[ArrayBuffer[Array[Double]]]()
+    var histo = ArrayBuffer[Array[Double]]()
     val numBins = 5 // B bins for Update procedure
     var numSize = 0
     var numSplit = 3 //By default it should be same as numBins
-    //var j=lines.size
-    //println("lines------------"+j)
-    
+
     for (line <- lines) {
       println("---line---  " + line)
       val numStr = line.toString
@@ -27,44 +24,69 @@ object DecisionTree {
       nums.foreach(println)
       println("--nums size--" + nums.size)
 
-      if (i == 0) {
-        println("----------Line 1----------------------")
-        histoA = updatePro(nums, numBins)
-        numSize+=nums.size
-      } else if (i == 1) {
-        println("----------Line 2----------------------")
-        histoB = updatePro(nums, numBins)
-        numSize+=nums.size
-        // Print out test result
-//        println(histoB(0)(0), histoB(0)(1))
-//        println(histoB(1)(0), histoB(1)(1))
-//        println(histoB(2)(0), histoB(2)(1))
-//        println(histoB(3)(0), histoB(3)(1))
-//        println(histoB(4)(0), histoB(4)(1))
-//        val sumTest = sumPro(histoB, 15)(0)
-//        val iTest = sumPro(histoB, 15)(1)
-//        println(sumTest)
-//        println(iTest)
-//
-//        var u = uniformPro(histoB, 3, nums.size)
-//        u.foreach(println)
-
-      }
-      i += 1
+      histoList += updatePro(nums, numBins)
+      numSize += nums.size
     }
-    // merge A B 
-    var histo = mergePro(histoA, histoB, numBins)
+
+    // merge all labeled histogram
+    for (histolist <- histoList) {
+      histo = mergePro(histo, histolist, numBins)
+    }
+    //var histo = mergePro(histoA, histoB, numBins)
     println(histo(0)(0), histo(0)(1))
     println(histo(1)(0), histo(1)(1))
     println(histo(2)(0), histo(2)(1))
     println(histo(3)(0), histo(3)(1))
     println(histo(4)(0), histo(4)(1))
+
+    println("numSize" + numSize)
+    var uniform = uniformPro(histo, numSplit, numSize)
+    //u.foreach(println)
+    //println(histoList(1)(0)(0), histoList(1)(0)(1))
+
     
-    println("numSize"+numSize)
-    var u = uniformPro(histo, numSplit, numSize)
-    u.foreach(println)
+    
+    var histoOne = Array.ofDim[Double](uniform.size,histoList.size)
+    var histoSum = new Array[Double](uniform.size)
+    var pro = Array.ofDim[Double](uniform.size,histoList.size)
+    var proSum = new Array[Double](uniform.size)   
+    println("x*y  "+uniform.size+"__"+histoList.size)    
+    
+    var i = 0
+    for (uu <- uniform) {
+      var j = 0
+      println(uu+"______________")
+      for (histolist <- histoList) {                 
+        histoOne(i)(j) = sumPro(histolist, uu)(0)
+        println("histoOne("+i+")("+j+")")
+        println(histoOne(i)(j))
+        histoSum(i) += histoOne(i)(j)
+        println("histoSum("+i+")")
+        println(histoSum(i))
+        j += 1
+      }
+      i += 1
+    }
+    
+      
+    i = 0   
+    for (uu <- uniform) {
+      var j = 0
+      for (histolist <- histoList) {
+        // entropy
+        pro(i)(j) = -histoOne(i)(j) * log(histoOne(i)(j) / histoSum(i)) / histoSum(i)
+        proSum(i) += pro(i)(j)
+        j += 1
+      }
+      i += 1
+    }
+    
+    proSum.max
+    println(proSum.max)
+    
     
   }
+  
 
   // Update procedure
   def updatePro(nums: Array[String], numBins: Int): ArrayBuffer[Array[Double]] = {
@@ -190,6 +212,7 @@ object DecisionTree {
     histo
 
   }
-
+  
+ 
 }
 
