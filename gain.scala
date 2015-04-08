@@ -87,24 +87,34 @@ object DecisionTree {
   // Sum procedure
   def sumPro(histo: ArrayBuffer[Array[Double]], b: Double): Array[Double] = {
     var i = 0
+    var s = 0.0
 
-    while (b >= histo(i)(0)) {
-      i += 1
+    if (b >= histo(histo.size - 1)(0)) {
+      for (hist <- histo) {
+        s += hist(1)
+      }
+    } else if (b < histo(0)(0)) {
+      s = 0
+    } else {
+      while (b >= histo(i)(0)) {
+        i += 1
+      }
+      i -= 1
+
+      val mi = histo(i)(1)
+      val mii = histo(i + 1)(1)
+      val pi = histo(i)(0)
+      val pii = histo(i + 1)(0)
+      val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
+      s = (mi + mb) * (b - pi) / (2 * (pii - pi))
+
+      for (j <- 0 to i - 1) {
+        s += histo(j)(1)
+      }
+      s += histo(i)(1) / 2
     }
-    i -= 1
 
-    val mi = histo(i)(1)
-    val mii = histo(i + 1)(1)
-    val pi = histo(i)(0)
-    val pii = histo(i + 1)(0)
-    val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
-    var s = (mi + mb) * (b - pi) / (2 * (pii - pi))
-
-    for (j <- 0 to i - 1) {
-      s += histo(j)(1)
-    }
-
-    s += histo(i)(1) / 2
+    println(s)
     val result = Array(s, i)
     result
   }
