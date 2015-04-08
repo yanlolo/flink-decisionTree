@@ -43,8 +43,9 @@ object DecisionTree {
     val uniform = uniformPro(histo, numSplit, numSizeTotal)
 
     //entropy, gain of the split
-    println("entrpy="+entropy(histoList))
-    println("gain="+gain(histoList, uniform, histo))
+    println("entrpy=" + entropy(histoList))
+    println("gain=" + gain(histoList, uniform, histo))
+    split(histoList, 15.22)
 
   }
 
@@ -181,6 +182,7 @@ object DecisionTree {
 
   }
 
+  //entroy for histogram, the left part and right part
   def entropy(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]]): Double = {
 
     var histoOne = new Array[Double](histoList.size)
@@ -234,7 +236,8 @@ object DecisionTree {
     proSum
   }
 
-  def gain(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], uniform: Array[Double], histo: ArrayBuffer[Array[Double]]): Int = {
+  // find the maximum information gain 
+  def gain(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], uniform: Array[Double], histo: ArrayBuffer[Array[Double]]): Double = {
 
     var gain = new Array[Double](uniform.size)
     var i = 0
@@ -243,6 +246,7 @@ object DecisionTree {
 
     for (uu <- uniform) {
       var leftPro = sumPro(histo, uu)(0) / sumPro(histo)
+      //gain
       gain(i) = entropy(histoList) - leftPro * entropy(histoList, uu, 0) - (1 - leftPro) * entropy(histoList, uu, 1)
       if (gain(i) > maxGain) {
         maxGain = gain(i)
@@ -250,8 +254,65 @@ object DecisionTree {
       }
       i += 0
     }
-    maxIndex
+    uniform(maxIndex) //the split place
+  }
+
+  // split the samples into 2 parts based on the "gain"
+  def split(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], split: Double):  Array[ArrayBuffer[ArrayBuffer[Array[Double]]]]={
+    var histoLeft = ArrayBuffer[ArrayBuffer[Array[Double]]]()
+    var histoRight = ArrayBuffer[ArrayBuffer[Array[Double]]]()
+
+    var j = 0
+
+    for (histolist <- histoList) {
+
+      var histoleft = ArrayBuffer[Array[Double]]()
+      var historight = ArrayBuffer[Array[Double]]()
+      var i = 0
+
+      while (split >= histolist(i)(0)) {
+        i += 1
+      }
+      i -= 1
+      println(i)
+      val mi = histolist(i)(1)
+      val mii = histolist(i + 1)(1)
+      val pi = histolist(i)(0)
+      val pii = histolist(i + 1)(0)
+      val mb = mi + (mii - mi) * (split - pi) / (pii - pi)
+      var s = (mi + mb) * (split - pi) / (2 * (pii - pi))
+      println(s)
+
+      //left subtree
+      for (ii <- 0 to i - 1) {
+        histoleft += histolist(ii)
+      }
+
+      histoleft += Array(histolist(i)(0), histolist(i)(1) / 2)
+      if (s != 0) {
+        histoleft += Array(split, s)
+      }
+
+      histoLeft += histoleft
+      println(histoLeft(j)(0)(0), histoLeft(j)(0)(1))
+      println(histoLeft(j)(1)(0), histoLeft(j)(1)(1))
+      println(histoLeft(j)(2)(0), histoLeft(j)(2)(1))
+      
+      //right subtree
+      historight += Array(split, histolist(i+1)(1)-s)
+      for (ii <- i+2 to histolist.size-1) {
+        historight += histolist(ii)
+      }
+      histoRight += historight
+      println(histoRight(j)(0)(0), histoRight(j)(0)(1))
+      println(histoRight(j)(1)(0), histoRight(j)(1)(1))
+      println(histoRight(j)(2)(0), histoRight(j)(2)(1))
+
+      j += 1
+
+    }
+    val result = Array(histoLeft, histoRight)
+    result
   }
 
 }
-
