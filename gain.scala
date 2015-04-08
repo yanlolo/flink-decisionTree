@@ -6,6 +6,7 @@ import math._
 object test {
   def main(args: Array[String]): Unit = {
     println("--Welcom to Decision Tree --")
+    println("Input data: ")
     val source = Source.fromFile("d:/Userfiles/yyan/Desktop/data/test.txt")
     val lines = source.getLines
 
@@ -344,9 +345,7 @@ object test {
 
     //uniform for the histogram
     val uniform = uniformPro(histo, numSplit, numSample)
-
-    //entropy, gain of the split
-    println("entrpy=" + entropy(histoList))
+   
     //    // Test for sumPro
     //    for (histolist <- histoList) {
     //      println(" ---- -----labeled--------- ---- ")
@@ -357,10 +356,14 @@ object test {
     //      println(histolist(4)(0), histolist(4)(1))
     //      sumPro(histolist, 100)
     //    }
-    println("entrpy=" + entropy(histoList, 25.91, 0))
-    //println("gain=" + findBestSplit(histoList, uniform, histo))
+    
+//    // Test for entropy, findBestSplit
+//    println("entrpy=" + entropy(histoList))
+//    println("entrpy=" + entropy(histoList, 25.91, 1))
+    var bestSplit = findBestSplit(histoList, uniform, histo)
+    println("Split at " + bestSplit)
 
-    //split(histoList, findBestSplit(histoList, uniform, histo))
+    split(histoList, bestSplit)     //???
   }
 
 }
