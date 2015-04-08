@@ -6,54 +6,49 @@ import math._
 
 object DecisionTree {
   def main(args: Array[String]): Unit = {
-    println("--Decision Tres--")
+    println("--Decision Tree--")
     val source = Source.fromFile("d:/Userfiles/yyan/Desktop/data/test.txt")
     val lines = source.getLines
 
-    var histoList = ArrayBuffer[ArrayBuffer[Array[Double]]]()   // update result for every labels 
-    var histo = ArrayBuffer[Array[Double]]()   // merge of histoList
+    var histoList = ArrayBuffer[ArrayBuffer[Array[Double]]]() // update result for every labels 
+    var histo = ArrayBuffer[Array[Double]]() // merge of histoList
     val numBins = 5 // B bins for Update procedure
-    var numSizeTotal = 0   //total number of sample for THE ONLY ONE FEATURE
+    val numSplit = 3 //By default it should be same as numBins
+    var numSizeTotal = 0 //total number of sample for THE ONLY ONE FEATURE
     var numSize = ArrayBuffer[Int]() // number of samples in every Label
-    var numSplit = 3 //By default it should be same as numBins
 
     for (line <- lines) {
+      val nums = line.toString.split(" ")
+      numSize += nums.size
+      numSizeTotal += nums.size
+      //print input file
       println("---line---  " + line)
-      val numStr = line.toString
-      val nums = numStr.split(" ")
       println("--nums size--" + nums.size)
 
+      //update accordingly for every labeled samples
       histoList += updatePro(nums, numBins)
-      numSizeTotal += nums.size
-    } 
-    
-
-    
-    for (line <- lines) {     
-      numSize += line.toString.split(" ").size     
     }
-    println("--___________________--")
-    numSize.foreach(println)
 
     // merge all labeled histogram
     for (histolist <- histoList) {
       histo = mergePro(histo, histolist, numBins)
-    }
+    } //print all sample's histogram
     println(histo(0)(0), histo(0)(1))
     println(histo(1)(0), histo(1)(1))
     println(histo(2)(0), histo(2)(1))
     println(histo(3)(0), histo(3)(1))
     println(histo(4)(0), histo(4)(1))
 
-    println("numSize" + numSizeTotal)
-    var uniform = uniformPro(histo, numSplit, numSizeTotal)
+    //uniform for the histogram
+    val uniform = uniformPro(histo, numSplit, numSizeTotal)
 
-    println(entropy(histoList))
-    gain(histoList,uniform,histo)
+    //entropy, gain of the split
+    println("entrpy="+entropy(histoList))
+    println("gain="+gain(histoList, uniform, histo))
 
   }
 
-  // Update procedure
+  // Update procedure 
   def updatePro(nums: Array[String], numBins: Int): ArrayBuffer[Array[Double]] = {
 
     var numMerge = 0 // which 2 close bins to merge  
@@ -195,36 +190,7 @@ object DecisionTree {
 
     var i = 0
     for (histolist <- histoList) {
-      histoOne(i) = sumPro(histolist)     
-      histoSum += histoOne(i)      
-      i += 1
-    }
-
-    i = 0
-    for (histolist <- histoList) {
-      // entropy
-      pro(i) = -histoOne(i) * log(histoOne(i) / histoSum) / histoSum // log is equal to "ln" 
-      proSum += pro(i)
-      i += 1
-    }
-    proSum
-  }
-
-  def entropy(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], b: Double, flag:Int): Double = {
-
-    var histoOne = new Array[Double](histoList.size)
-    var histoSum = 0.0
-    var pro = new Array[Double](histoList.size)
-    var proSum = 0.0
-
-    var i = 0
-    for (histolist <- histoList) {
-      if (flag == 0){//right
-        histoOne(i) = sumPro(histolist, b)(0)       
-      }else if (flag == 1){//left
-        histoOne(i) = sumPro(histolist)-sumPro(histolist, b)(0)
-      }
-      
+      histoOne(i) = sumPro(histolist)
       histoSum += histoOne(i)
       i += 1
     }
@@ -238,30 +204,52 @@ object DecisionTree {
     }
     proSum
   }
-  
-  
 
-  def gain(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], uniform: Array[Double], histo: ArrayBuffer[Array[Double]]):Int= {
+  def entropy(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], b: Double, flag: Int): Double = {
+
+    var histoOne = new Array[Double](histoList.size)
+    var histoSum = 0.0
+    var pro = new Array[Double](histoList.size)
+    var proSum = 0.0
+
+    var i = 0
+    for (histolist <- histoList) {
+      if (flag == 0) { //right
+        histoOne(i) = sumPro(histolist, b)(0)
+      } else if (flag == 1) { //left
+        histoOne(i) = sumPro(histolist) - sumPro(histolist, b)(0)
+      }
+
+      histoSum += histoOne(i)
+      i += 1
+    }
+
+    i = 0
+    for (histolist <- histoList) {
+      // entropy
+      pro(i) = -histoOne(i) * log(histoOne(i) / histoSum) / histoSum // log is equal to "ln" 
+      proSum += pro(i)
+      i += 1
+    }
+    proSum
+  }
+
+  def gain(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], uniform: Array[Double], histo: ArrayBuffer[Array[Double]]): Int = {
 
     var gain = new Array[Double](uniform.size)
     var i = 0
     var maxGain = 0.0
     var maxIndex = 0
-    
-    print("_____gain_______")
-    for ( uu <- uniform){
-      println(uu)
-      var leftPro = sumPro(histo, uu)(0)/sumPro(histo)
-      gain(i) = entropy(histoList)-leftPro*entropy(histoList,uu,0) -(1-leftPro)*entropy(histoList,uu,1)
-      if (gain(i)>maxGain){
+
+    for (uu <- uniform) {
+      var leftPro = sumPro(histo, uu)(0) / sumPro(histo)
+      gain(i) = entropy(histoList) - leftPro * entropy(histoList, uu, 0) - (1 - leftPro) * entropy(histoList, uu, 1)
+      if (gain(i) > maxGain) {
         maxGain = gain(i)
         maxIndex = i
       }
-      i+=0
+      i += 0
     }
-//    println(maxGain)
-//    println(maxIndex)
-//    gain.foreach(println)
     maxIndex
   }
 
