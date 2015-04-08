@@ -1,51 +1,34 @@
-package lolo
 
 import scala.io.Source
 import collection.mutable.ArrayBuffer
 import math._
 
-object DecisionTree {
+object test {
   def main(args: Array[String]): Unit = {
-    println("--Decision Tree--")
+    println("--Welcom to Decision Tree --")
     val source = Source.fromFile("d:/Userfiles/yyan/Desktop/data/test.txt")
     val lines = source.getLines
 
     var histoList = ArrayBuffer[ArrayBuffer[Array[Double]]]() // update result for every labels 
-    var histo = ArrayBuffer[Array[Double]]() // merge of histoList
+
     val numBins = 5 // B bins for Update procedure
     val numSplit = 3 //By default it should be same as numBins
-    var numSizeTotal = 0 //total number of sample for THE ONLY ONE FEATURE
-    var numSize = ArrayBuffer[Int]() // number of samples in every Label
+    var numSample = 0 //total number of sample for THE ONLY ONE FEATURE
+    // var numSize = ArrayBuffer[Int]() // number of samples in every Label
 
     for (line <- lines) {
       val nums = line.toString.split(" ")
-      numSize += nums.size
-      numSizeTotal += nums.size
+      //numSize += nums.size
+      numSample += nums.size
       //print input file
-      println("---line---  " + line)
-      println("--nums size--" + nums.size)
+      println("line: " + line)
+      println("nums size: " + nums.size)
 
       //update accordingly for every labeled samples
       histoList += updatePro(nums, numBins)
     }
 
-    // merge all labeled histogram
-    for (histolist <- histoList) {
-      histo = mergePro(histo, histolist, numBins)
-    } //print all sample's histogram
-    println(histo(0)(0), histo(0)(1))
-    println(histo(1)(0), histo(1)(1))
-    println(histo(2)(0), histo(2)(1))
-    println(histo(3)(0), histo(3)(1))
-    println(histo(4)(0), histo(4)(1))
-
-    //uniform for the histogram
-    val uniform = uniformPro(histo, numSplit, numSizeTotal)
-
-    //entropy, gain of the split
-    println("entrpy=" + entropy(histoList))
-    println("gain=" + gain(histoList, uniform, histo))
-    split(histoList, 15.22)
+    buildTree(histoList, numBins, numSplit, numSample)
 
   }
 
@@ -114,7 +97,7 @@ object DecisionTree {
       s += histo(i)(1) / 2
     }
 
-    println(s)
+    println(" sumPro to "+b+" is " + s)
     val result = Array(s, i)
     result
   }
@@ -128,11 +111,12 @@ object DecisionTree {
   }
 
   // Uniform Procedure
-  def uniformPro(histo: ArrayBuffer[Array[Double]], numSplit: Int, numSize: Int): Array[Double] = {
+  def uniformPro(histo: ArrayBuffer[Array[Double]], numSplit: Int, numSample: Double): Array[Double] = {
+    println(" ---- -----candidate for split (interval)--------- ---- ")
     var u = new Array[Double](numSplit - 1)
 
     for (j <- 1 to numSplit - 1) {
-      var s = j * numSize / numSplit.toDouble
+      var s = j * numSample / numSplit.toDouble
 
       var i = 0
       var sumP = 0.0
@@ -210,7 +194,11 @@ object DecisionTree {
     i = 0
     for (histolist <- histoList) {
       // entropy
-      pro(i) = -histoOne(i) * log(histoOne(i) / histoSum) / histoSum // log is equal to "ln" 
+      if (histoOne(i) == 0) { // there are no samples belong to this label is smaller that b
+        pro(i) = 0
+      } else {
+        pro(i) = -histoOne(i) * log(histoOne(i) / histoSum) / histoSum // log is equal to "ln" 
+      }
       proSum += pro(i)
       i += 1
     }
@@ -233,13 +221,19 @@ object DecisionTree {
       }
 
       histoSum += histoOne(i)
+      //println("histoSum"+histoSum)
       i += 1
     }
 
     i = 0
     for (histolist <- histoList) {
       // entropy
-      pro(i) = -histoOne(i) * log(histoOne(i) / histoSum) / histoSum // log is equal to "ln" 
+      if (histoOne(i) == 0) { // there are no samples belong to this label is smaller that b
+        pro(i) = 0
+      } else {
+        pro(i) = -histoOne(i) * log(histoOne(i) / histoSum) / histoSum // log is equal to "ln" 
+      }
+      //println(pro(i))
       proSum += pro(i)
       i += 1
     }
@@ -247,7 +241,7 @@ object DecisionTree {
   }
 
   // find the maximum information gain 
-  def gain(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], uniform: Array[Double], histo: ArrayBuffer[Array[Double]]): Double = {
+  def findBestSplit(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], uniform: Array[Double], histo: ArrayBuffer[Array[Double]]): Double = {
 
     var gain = new Array[Double](uniform.size)
     var i = 0
@@ -268,7 +262,7 @@ object DecisionTree {
   }
 
   // split the samples into 2 parts based on the "gain"
-  def split(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], split: Double):  Array[ArrayBuffer[ArrayBuffer[Array[Double]]]]={
+  def split(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], split: Double): Array[ArrayBuffer[ArrayBuffer[Array[Double]]]] = {
     var histoLeft = ArrayBuffer[ArrayBuffer[Array[Double]]]()
     var histoRight = ArrayBuffer[ArrayBuffer[Array[Double]]]()
 
@@ -284,14 +278,13 @@ object DecisionTree {
         i += 1
       }
       i -= 1
-      println(i)
+
       val mi = histolist(i)(1)
       val mii = histolist(i + 1)(1)
       val pi = histolist(i)(0)
       val pii = histolist(i + 1)(0)
       val mb = mi + (mii - mi) * (split - pi) / (pii - pi)
       var s = (mi + mb) * (split - pi) / (2 * (pii - pi))
-      println(s)
 
       //left subtree
       for (ii <- 0 to i - 1) {
@@ -307,10 +300,10 @@ object DecisionTree {
       println(histoLeft(j)(0)(0), histoLeft(j)(0)(1))
       println(histoLeft(j)(1)(0), histoLeft(j)(1)(1))
       println(histoLeft(j)(2)(0), histoLeft(j)(2)(1))
-      
+
       //right subtree
-      historight += Array(split, histolist(i+1)(1)-s)
-      for (ii <- i+2 to histolist.size-1) {
+      historight += Array(split, histolist(i + 1)(1) - s)
+      for (ii <- i + 2 to histolist.size - 1) {
         historight += histolist(ii)
       }
       histoRight += historight
@@ -323,6 +316,51 @@ object DecisionTree {
     }
     val result = Array(histoLeft, histoRight)
     result
+  }
+
+  //build up the tree
+  def buildTree(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int, numSample: Double) {
+    println("                           ")
+    println("            Starting Building      ")
+    println("                           ")
+
+    var histo = ArrayBuffer[Array[Double]]() // merge of histoList
+    // merge all labeled histogram
+    for (histolist <- histoList) {
+      histo = mergePro(histo, histolist, numBins)
+      println(" ---- -----histogram for labeled samples--------- ---- ")
+      println(histolist(0)(0), histolist(0)(1))
+      println(histolist(1)(0), histolist(1)(1))
+      println(histolist(2)(0), histolist(2)(1))
+      println(histolist(3)(0), histolist(3)(1))
+      println(histolist(4)(0), histolist(4)(1))
+    } //print all sample's histogram
+    println(" ---- -----histogram for all samples--------- ---- ")
+    println(histo(0)(0), histo(0)(1))
+    println(histo(1)(0), histo(1)(1))
+    println(histo(2)(0), histo(2)(1))
+    println(histo(3)(0), histo(3)(1))
+    println(histo(4)(0), histo(4)(1))
+
+    //uniform for the histogram
+    val uniform = uniformPro(histo, numSplit, numSample)
+
+    //entropy, gain of the split
+    println("entrpy=" + entropy(histoList))
+    //    // Test for sumPro
+    //    for (histolist <- histoList) {
+    //      println(" ---- -----labeled--------- ---- ")
+    //      println(histolist(0)(0), histolist(0)(1))
+    //      println(histolist(1)(0), histolist(1)(1))
+    //      println(histolist(2)(0), histolist(2)(1))
+    //      println(histolist(3)(0), histolist(3)(1))
+    //      println(histolist(4)(0), histolist(4)(1))
+    //      sumPro(histolist, 100)
+    //    }
+    println("entrpy=" + entropy(histoList, 25.91, 0))
+    //println("gain=" + findBestSplit(histoList, uniform, histo))
+
+    //split(histoList, findBestSplit(histoList, uniform, histo))
   }
 
 }
