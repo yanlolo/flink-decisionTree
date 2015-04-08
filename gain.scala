@@ -27,13 +27,13 @@ object DecisionTree {
       numSizeTotal += nums.size
     } 
     
-//    println("dfha kdsfkads f" +numSize(0))
-//    var i = 0
-//    for (line <- lines) {     
-//      numSize(i) = line.toString.split(" ").size
-//      i+=1
-//    }
+
     
+    for (line <- lines) {     
+      numSize += line.toString.split(" ").size     
+    }
+    println("--___________________--")
+    numSize.foreach(println)
 
     // merge all labeled histogram
     for (histolist <- histoList) {
@@ -266,3 +266,4 @@ object DecisionTree {
   }
 
 }
+
