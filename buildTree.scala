@@ -1,14 +1,12 @@
-//works for first level split
-// show the result for left and right tree
-
+package lolo
 
 import scala.io.Source
 import collection.mutable.ArrayBuffer
 import math._
 
-object test {
+object DecisionTree {
   def main(args: Array[String]): Unit = {
-    println("--Welcom to Decision Tree --")
+    println("-- Welcom to Decision Tree --")
     println("Input data: ")
     val source = Source.fromFile("d:/Userfiles/yyan/Desktop/data/test.txt")
     val lines = source.getLines
@@ -17,13 +15,9 @@ object test {
 
     val numBins = 5 // B bins for Update procedure
     val numSplit = 3 //By default it should be same as numBins
-    var numSample = 0 //total number of sample for THE ONLY ONE FEATURE
-    // var numSize = ArrayBuffer[Int]() // number of samples in every Label
 
     for (line <- lines) {
       val nums = line.toString.split(" ")
-      //numSize += nums.size
-      numSample += nums.size
       //print input file
       println("line: " + line)
       println("nums size: " + nums.size)
@@ -32,7 +26,8 @@ object test {
       histoList += updatePro(nums, numBins)
     }
 
-    buildTree(histoList, numBins, numSplit, numSample)
+    //build one level 
+    buildOneLevel(histoList, numBins, numSplit)
 
   }
 
@@ -101,7 +96,7 @@ object test {
       s += histo(i)(1) / 2
     }
 
-    println(" sumPro to " + b + " is " + s)
+    //println(" sumPro to " + b + " is " + s)
     val result = Array(s, i)
     result
   }
@@ -262,6 +257,7 @@ object test {
       }
       i += 0
     }
+    println("If feature is smaller than " + uniform(maxIndex))
     uniform(maxIndex) //the split place
   }
 
@@ -280,16 +276,16 @@ object test {
 
       if (split >= histolist(histolist.size - 1)(0)) {
         histoLeft += histolist
-        println(" -- ONLY Left Tree -- ")
-        for (ii <- 0 to histolist.size - 1) {
-          println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
-        }
+        //        println(" -- ONLY Left Tree -- ")
+        //        for (ii <- 0 to histolist.size - 1) {
+        //          println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
+        //        }
       } else if (split < histolist(0)(0)) {
         histoRight += histolist
-        println(" -- ONLY Right Tree -- ")
-        for (ii <- 0 to histolist.size - 1) {
-          println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
-        }
+        //        println(" -- ONLY Right Tree -- ")
+        //        for (ii <- 0 to histolist.size - 1) {
+        //          println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
+        //        }
       } else {
         while (split >= histolist(i)(0)) {
           i += 1
@@ -320,15 +316,15 @@ object test {
         }
         histoRight += historight
 
-        println(" -- Left Tree -- ")
-        for (ii <- 0 to i + 1) {
-          println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
-        }
-
-        println(" -- Right Tree -- ")
-        for (ii <- 0 to histolist.size - 1 - (i + 1)) {
-          println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
-        }
+        //        println(" -- Left Tree -- ")
+        //        for (ii <- 0 to i + 1) {
+        //          println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
+        //        }
+        //
+        //        println(" -- Right Tree -- ")
+        //        for (ii <- 0 to histolist.size - 1 - (i + 1)) {
+        //          println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
+        //        }
 
       }
 
@@ -339,51 +335,68 @@ object test {
     result
   }
 
-  //build up the tree
-  def buildTree(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int, numSample: Double) {
+  // which label for samples samller than 'split'
+  def label(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]]): Int = {
+
+    var histoOne = new Array[Double](histoList.size)
+    var maxHisto = 0.0
+    var maxIndex = 0
+
+    var i = 0
+    for (histolist <- histoList) {
+      if (sumPro(histolist) > maxHisto) {
+        maxHisto = sumPro(histolist)
+        maxIndex = i
+      }
+      i += 1
+    }
+    println("labeled as label " + maxIndex)
+    maxIndex
+  }
+
+  // numbers of all samples
+  def calcuSampleNum(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]]): Double = {
+    var num = 0.0
+    for (histolist <- histoList) {
+      for (i <- 0 to histolist.size - 1) {
+        num += histolist(i)(1)
+      }
+    }
+    num
+  }
+
+  //build up one level of TREE ??==> return!!
+  def buildOneLevel(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int) {
     println("                           ")
     println("            Starting Building      ")
     println("                           ")
 
-    var histo = ArrayBuffer[Array[Double]]() // merge of histoList
+    var numSample = calcuSampleNum(histoList)
+
     // merge all labeled histogram
+    var histo = ArrayBuffer[Array[Double]]() // merge of histoList   
     for (histolist <- histoList) {
       histo = mergePro(histo, histolist, numBins)
       println(" ---- -----histogram for labeled samples--------- ---- ")
-      println(histolist(0)(0), histolist(0)(1))
-      println(histolist(1)(0), histolist(1)(1))
-      println(histolist(2)(0), histolist(2)(1))
-      println(histolist(3)(0), histolist(3)(1))
-      println(histolist(4)(0), histolist(4)(1))
+      for (i <- 0 to histolist.size - 1) {
+        println(histolist(i)(0), histolist(i)(1))
+      }
     }
-    println(" ---- -----histogram for all samples--------- ---- ")
-    println(histo(0)(0), histo(0)(1))
-    println(histo(1)(0), histo(1)(1))
-    println(histo(2)(0), histo(2)(1))
-    println(histo(3)(0), histo(3)(1))
-    println(histo(4)(0), histo(4)(1))
+    println(" ---- -----histogram for all samples --------- ---- ")
+    for (i <- 0 to histo.size - 1) {
+      println(histo(i)(0), histo(i)(1))
+    }
 
     //uniform for the histogram
     val uniform = uniformPro(histo, numSplit, numSample)
-
-    //    // Test for sumPro
-    //    for (histolist <- histoList) {
-    //      println(" ---- -----labeled--------- ---- ")
-    //      println(histolist(0)(0), histolist(0)(1))
-    //      println(histolist(1)(0), histolist(1)(1))
-    //      println(histolist(2)(0), histolist(2)(1))
-    //      println(histolist(3)(0), histolist(3)(1))
-    //      println(histolist(4)(0), histolist(4)(1))
-    //      sumPro(histolist, 100)
-    //    }
-
-    //    // Test for entropy, findBestSplit
-    //    println("entrpy=" + entropy(histoList))
-    //    println("entrpy=" + entropy(histoList, 25.91, 1))
     var bestSplit = findBestSplit(histoList, uniform, histo)
-    println("Split at " + bestSplit)
+    var Array(left, right) = split(histoList, bestSplit)
+    label(left)
+  }
 
-    split(histoList, bestSplit)
+  //build up one level of TREE
+  def buildTree(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int) {
+
   }
 
 }
