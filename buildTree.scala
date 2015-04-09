@@ -27,7 +27,8 @@ object DecisionTree {
     }
 
     //build one level 
-    buildOneLevel(histoList, numBins, numSplit)
+    //buildOneLevel(histoList, numBins, numSplit)
+    buildTree(histoList, numBins, numSplit, 2)
 
   }
 
@@ -276,16 +277,16 @@ object DecisionTree {
 
       if (split >= histolist(histolist.size - 1)(0)) {
         histoLeft += histolist
-        //        println(" -- ONLY Left Tree -- ")
-        //        for (ii <- 0 to histolist.size - 1) {
-        //          println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
-        //        }
+                println(" -- ONLY Left Tree -- ")
+                for (ii <- 0 to histolist.size - 1) {
+                  println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
+                }
       } else if (split < histolist(0)(0)) {
         histoRight += histolist
-        //        println(" -- ONLY Right Tree -- ")
-        //        for (ii <- 0 to histolist.size - 1) {
-        //          println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
-        //        }
+                println(" -- ONLY Right Tree -- ")
+                for (ii <- 0 to histolist.size - 1) {
+                  println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
+                }
       } else {
         while (split >= histolist(i)(0)) {
           i += 1
@@ -316,15 +317,15 @@ object DecisionTree {
         }
         histoRight += historight
 
-        //        println(" -- Left Tree -- ")
-        //        for (ii <- 0 to i + 1) {
-        //          println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
-        //        }
-        //
-        //        println(" -- Right Tree -- ")
-        //        for (ii <- 0 to histolist.size - 1 - (i + 1)) {
-        //          println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
-        //        }
+                println(" -- Left Tree -- ")
+                for (ii <- 0 to i + 1) {
+                  println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
+                }
+        
+                println(" -- Right Tree -- ")
+                for (ii <- 0 to histolist.size - 1 - (i + 1)) {
+                  println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
+                }
 
       }
 
@@ -366,12 +367,10 @@ object DecisionTree {
   }
 
   //build up one level of TREE ??==> return!!
-  def buildOneLevel(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int) {
-    println("                           ")
-    println("            Starting Building      ")
-    println("                           ")
+  def buildOneLevel(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int): ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]] = {
 
     var numSample = calcuSampleNum(histoList)
+    var tree = ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]]()
 
     // merge all labeled histogram
     var histo = ArrayBuffer[Array[Double]]() // merge of histoList   
@@ -391,12 +390,39 @@ object DecisionTree {
     val uniform = uniformPro(histo, numSplit, numSample)
     var bestSplit = findBestSplit(histoList, uniform, histo)
     var Array(left, right) = split(histoList, bestSplit)
+    tree += left
+    tree += right
     label(left)
+    tree
   }
 
   //build up one level of TREE
-  def buildTree(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int) {
+  def buildTree(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int, numLevel: Int) {
+    var tree = ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]]()
+    var tempTree = ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]]()
 
+    println("                           ")
+    println("            Starting Building      ")
+    println("                           ")
+
+    tree = buildOneLevel(histoList, numBins, numSplit)
+    for (i <- 1 to numLevel) {
+      for (subTree <- tree) {
+        if (subTree != null) {
+          tempTree ++= buildOneLevel(subTree, numBins, numSplit)
+        }
+        tree = tempTree
+        tempTree = ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]]()
+      }
+    }
+
+    
   }
+  
+  
+  
+  
+
+
 
 }
