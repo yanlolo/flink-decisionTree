@@ -303,6 +303,7 @@ object DecisionTree {
       var historight = ArrayBuffer[Array[Double]]()
       var i = 0
 
+      if ( split >= histolist(histolist.size - 1)(0)) {   // How if histolist.size = 1 ???!!!
         histoLeft += histolist
         histoRight += Null                 // modify
         println(" -- ONLY Left Tree -- ")
