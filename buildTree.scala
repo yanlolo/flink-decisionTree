@@ -1,4 +1,7 @@
 package lolo
+//Testing with ....
+//23 19 10 16 36 2 9 32 30 45
+//46 78 83 30 64 28 87 90 53 72
 
 import scala.io.Source
 import collection.mutable.ArrayBuffer
@@ -28,7 +31,19 @@ object DecisionTree {
 
     //build one level 
     //buildOneLevel(histoList, numBins, numSplit)
-    buildTree(histoList, numBins, numSplit, 2)
+
+    //buildTree(histoList, numBins, numSplit, 2)
+
+    //    var test = ArrayBuffer[Array[Double]]()
+    //    test += Array(2.0, 0.5)
+    //    test += Array(9.47, 1.49)
+    //    var numSample = 2.0
+    //    uniformPro(test, numSplit, numSample)
+
+    var test = ArrayBuffer[ArrayBuffer[Array[Double]]]() // update result for every labels 
+    test += ArrayBuffer(Array(27.145006952796034, 2.3192232370864656))
+    test += ArrayBuffer(Array(29.0, 2.0), Array(49.5, 2.0), Array(64.0, 1.0), Array(75.0, 2.0), Array(86.7, 3.0))
+    buildOneLevel(test, numBins, numSplit)
 
   }
 
@@ -114,29 +129,42 @@ object DecisionTree {
   def uniformPro(histo: ArrayBuffer[Array[Double]], numSplit: Int, numSample: Double): Array[Double] = {
     println(" ---- -----candidate for split (interval)--------- ---- ")
     var u = new Array[Double](numSplit - 1)
+    var d = 0.0
+    var i = 0
 
     for (j <- 1 to numSplit - 1) {
       var s = j * numSample / numSplit.toDouble
 
-      var i = 0
-      var sumP = 0.0
-      // Sum Procedure
-      while (sumP < s) {
-        if (i == 0)
-          sumP += histo(i)(1) / 2
-        else
-          sumP += histo(i)(1) / 2 + histo(i - 1)(1) / 2
-        i += 1
+      if (s <= histo(0)(1)) { // s is too small 
+        u(j - 1) = histo(0)(0)
+      } else {
+        if (s >= numSample - histo(histo.size - 1)(1) / 2) { // s is too large 
+          d = s - (numSample - histo(histo.size - 1)(1))
+          i = histo.size - 2
+        } else {
+          i = 0
+          var sumP = 0.0
+          // Sum Procedure
+          while (sumP < s) {
+            if (i == 0)
+              sumP += histo(i)(1) / 2
+            else
+              sumP += histo(i)(1) / 2 + histo(i - 1)(1) / 2
+            i += 1
+          }
+          i -= 2
+          d = s - (sumP - histo(i + 1)(1) / 2 - histo(i)(1) / 2)
+        }
+
+        var a = histo(i + 1)(1) - histo(i)(1)
+        var b = 2 * histo(i)(1)
+        var c = -2 * d
+        var z = if (a == 0) -c / b else (-b + sqrt(pow(b, 2) - 4 * a * c)) / (2 * a)
+
+        u(j - 1) = histo(i)(0) + (histo(i + 1)(0) - histo(i)(0)) * z
+
       }
-      i -= 2
 
-      var d = s - (sumP - histo(i + 1)(1) / 2 - histo(i)(1) / 2)
-      var a = histo(i + 1)(1) - histo(i)(1)
-      var b = 2 * histo(i)(1)
-      var c = -2 * d
-      var z = if (a == 0) -c / b else (-b + sqrt(pow(b, 2) - 4 * a * c)) / (2 * a)
-
-      u(j - 1) = histo(i)(0) + (histo(i + 1)(0) - histo(i)(0)) * z
       println("u(" + j + ")=" + u(j - 1))
     }
     u
@@ -275,18 +303,20 @@ object DecisionTree {
       var historight = ArrayBuffer[Array[Double]]()
       var i = 0
 
-      if (split >= histolist(histolist.size - 1)(0)) {
         histoLeft += histolist
-                println(" -- ONLY Left Tree -- ")
-                for (ii <- 0 to histolist.size - 1) {
-                  println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
-                }
-      } else if (split < histolist(0)(0)) {
+        histoRight += Null                 // modify
+        println(" -- ONLY Left Tree -- ")
+        for (ii <- 0 to histolist.size - 1) {
+          println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
+        }
+      } else if (split <= histolist(0)(0)) {
         histoRight += histolist
-                println(" -- ONLY Right Tree -- ")
-                for (ii <- 0 to histolist.size - 1) {
-                  println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
-                }
+        histoLeft += Null                // modify
+        println(" -- ONLY Right Tree -- ")
+        for (ii <- 0 to histolist.size - 1) {
+          println(ii+" "+j)
+          println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
+        }
       } else {
         while (split >= histolist(i)(0)) {
           i += 1
@@ -301,8 +331,10 @@ object DecisionTree {
         var s = (mi + mb) * (split - pi) / (2 * (pii - pi))
 
         //left subtree
-        for (ii <- 0 to i - 1) {
-          histoleft += histolist(ii)
+        if (i > 0) {
+          for (ii <- 0 to i - 1) {
+            histoleft += histolist(ii)
+          }
         }
         histoleft += Array(histolist(i)(0), histolist(i)(1) / 2)
         if (s != 0) {
@@ -317,15 +349,27 @@ object DecisionTree {
         }
         histoRight += historight
 
-                println(" -- Left Tree -- ")
-                for (ii <- 0 to i + 1) {
-                  println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
-                }
-        
-                println(" -- Right Tree -- ")
-                for (ii <- 0 to histolist.size - 1 - (i + 1)) {
-                  println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
-                }
+        println(" -- Left Tree -- ")
+        if (s != 0) {
+          for (ii <- 0 to i + 1) {
+            println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
+          }
+        } else {
+          for (ii <- 0 to i) {
+            println(histoLeft(j)(ii)(0), histoLeft(j)(ii)(1))
+          }
+        }
+
+        println(" -- Right Tree -- ")
+        if (s != 0) {
+          for (ii <- 0 to histolist.size - 1 - (i + 1)) {
+            println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
+          }
+        } else {
+          for (ii <- 0 to histolist.size - 1 - i) {
+            println(histoRight(j)(ii)(0), histoRight(j)(ii)(1))
+          }
+        }
 
       }
 
@@ -355,21 +399,20 @@ object DecisionTree {
     maxIndex
   }
 
-  // numbers of all samples
-  def calcuSampleNum(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]]): Double = {
-    var num = 0.0
-    for (histolist <- histoList) {
-      for (i <- 0 to histolist.size - 1) {
-        num += histolist(i)(1)
-      }
-    }
-    num
-  }
+  //    // numbers of all samples
+  //    def calcuSampleNum(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]]): Double = {
+  //      var num = 0.0
+  //      for (histolist <- histoList) {
+  //        for (i <- 0 to histolist.size - 1) {
+  //          num += histolist(i)(1)
+  //        }
+  //      }
+  //      num
+  //    }
 
   //build up one level of TREE ??==> return!!
   def buildOneLevel(histoList: ArrayBuffer[ArrayBuffer[Array[Double]]], numBins: Int, numSplit: Int): ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]] = {
 
-    var numSample = calcuSampleNum(histoList)
     var tree = ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]]()
 
     // merge all labeled histogram
@@ -387,6 +430,7 @@ object DecisionTree {
     }
 
     //uniform for the histogram
+    var numSample = sumPro(histo)
     val uniform = uniformPro(histo, numSplit, numSample)
     var bestSplit = findBestSplit(histoList, uniform, histo)
     var Array(left, right) = split(histoList, bestSplit)
@@ -407,22 +451,16 @@ object DecisionTree {
 
     tree = buildOneLevel(histoList, numBins, numSplit)
     for (i <- 1 to numLevel) {
-      for (subTree <- tree) {
+      for (subTree <- tree) {                          // if subtree != null then split .....!!!
         if (subTree != null) {
           tempTree ++= buildOneLevel(subTree, numBins, numSplit)
         }
-        tree = tempTree
-        tempTree = ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]]()
+
       }
+      tree = tempTree
+      tempTree = ArrayBuffer[ArrayBuffer[ArrayBuffer[Array[Double]]]]()
     }
 
-    
   }
-  
-  
-  
-  
-
-
 
 }
