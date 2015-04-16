@@ -16,33 +16,46 @@ object input {
     val featureNum = 2 // number of independent features
     val numBins = 5 // B bins for Update procedure
     val numSplit = 3 //By default it should be same as numBins
+    val numLevel = 2 // how many levels of tree
+    val leastSample = 5 // least number of samples in one node
 
     var data = dataInput("d:/Userfiles/yyan/Desktop/data/data.txt")
-    var clsData = dataPro(data)
-    var feature = histoPro(clsData, featureNum, numBins)
-    var splitFeature = bestFeatureSplit(feature, numBins, numSplit)(0)
-    var splitPlace = bestFeatureSplit(feature, numBins, numSplit)(1)
-    var ff = split(data, splitFeature.toInt, splitPlace)
-    var dataR = ff(0)
-    var dataL = ff(1)
 
-    println("   R   ")
-    for (i <- 0 to dataR.size - 1) {
-      for (j <- 0 to dataR(0).size - 1) {
-        print(dataR(i)(j) + "   ")
-      }
-      println("      ")
-    }
-    println("   L   ")
-    for (i <- 0 to dataL.size - 1) {
-      for (j <- 0 to dataL(0).size - 1) {
-        print(dataL(i)(j) + "   ")
-      }
-      println("      ")
-    }
-    
-    toWhichLabel(feature, splitFeature.toInt, splitPlace)
+    var dataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
+    dataList += data
+    var tempDataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
 
+    var level = 1
+    while (level <= numLevel) {
+      println(" Level " + level)
+      for (data <- dataList) {
+        var clsData = dataPro(data)
+        var feature = histoPro(clsData, featureNum, numBins)
+        var splitFeature = bestFeatureSplit(feature, numBins, numSplit)(0)
+        var splitPlace = bestFeatureSplit(feature, numBins, numSplit)(1)
+        var ff = split(data, splitFeature.toInt, splitPlace)
+        var dataR = ff(0)
+        var dataL = ff(1)
+        println("   R   ")
+        for (i <- 0 to dataR.size - 1) {
+          for (j <- 0 to dataR(0).size - 1) {
+            print(dataR(i)(j) + "   ")
+          }
+          println("      ")
+        }
+        println("   L   ")
+        for (i <- 0 to dataL.size - 1) {
+          for (j <- 0 to dataL(0).size - 1) {
+            print(dataL(i)(j) + "   ")
+          }
+          println("      ")
+        }
+        toWhichLabel(feature, splitFeature.toInt, splitPlace)
+        tempDataList ++= ff
+      }
+      dataList = tempDataList
+      level += 1
+    }
   }
 
   /* 
@@ -105,7 +118,7 @@ object input {
     for (i <- 0 to 1) {
       for (j <- 0 to 1) {
         println("feature " + i + " , label " + j)
-        for (k <- 0 to 9) {
+        for (k <- 0 to clsData(i)(j).size - 1) {
           print(clsData(i)(j)(k) + "  ")
         }
         println("      ")
@@ -417,7 +430,7 @@ object input {
     result
   }
 
-/*
+  /*
  * split 
  */
   def split(data: ArrayBuffer[ArrayBuffer[Double]], splitFeature: Int, splitPlace: Double): ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]] = {
@@ -450,27 +463,27 @@ object input {
     result += dataR
     result += dataL
   }
-  
-      //  labeled as which label?  feature? for samples smaller than 'split'
-    def toWhichLabel(feature: ArrayBuffer[Map[Int, ArrayBuffer[Array[Double]]]],splitFeature: Int, splitPlace: Double ): Int = {
-  
-      var labelMap = feature(splitFeature)
-      var histoOne = new Array[Double](labelMap.size)
-      var maxHisto = 0.0
-      var maxIndex = 0
-      var sum = 0.0
-  
-      var i = 0
-      for ((k, v) <- labelMap) {
-        sum = sumPro(v)
-        if (sum > maxHisto) {
-          maxHisto = sum
-          maxIndex = i
-        }
-        i += 1
+
+  //  labeled as which label?  feature? for samples smaller than 'split'
+  def toWhichLabel(feature: ArrayBuffer[Map[Int, ArrayBuffer[Array[Double]]]], splitFeature: Int, splitPlace: Double): Int = {
+
+    var labelMap = feature(splitFeature)
+    var histoOne = new Array[Double](labelMap.size)
+    var maxHisto = 0.0
+    var maxIndex = 0
+    var sum = 0.0
+
+    var i = 0
+    for ((k, v) <- labelMap) {
+      sum = sumPro(v)
+      if (sum > maxHisto) {
+        maxHisto = sum
+        maxIndex = i
       }
-      println("If sample's feature " + splitFeature+ " is smaller than "+splitPlace+" , then it should be labeled as "+ maxIndex)
-      maxIndex
+      i += 1
     }
+    println("If sample's feature " + splitFeature + " is smaller than " + splitPlace + " , then it should be labeled as " + maxIndex)
+    maxIndex
+  }
 
 }
