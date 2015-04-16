@@ -40,6 +40,8 @@ object input {
       }
       println("      ")
     }
+    
+    toWhichLabel(feature, splitFeature.toInt, splitPlace)
 
   }
 
@@ -415,33 +417,13 @@ object input {
     result
   }
 
-  //  //  labeled as which label?  feature? for samples smaller than 'split'
-  //  def toWhichLabel(labelMap: Map[Int, ArrayBuffer[Array[Double]]]): Int = {
-  //
-  //    var histoOne = new Array[Double](labelMap.size)
-  //    var maxHisto = 0.0
-  //    var maxIndex = 0
-  //    var sum = 0.0
-  //
-  //    var i = 0
-  //    for ((k, v) <- labelMap) {
-  //      sum = sumPro(v)
-  //      if (sum > maxHisto) {
-  //        maxHisto = sum
-  //        maxIndex = i
-  //      }
-  //      i += 1
-  //    }
-  //    println("labeled as label " + maxIndex)
-  //    maxIndex
-  //  }
-
+/*
+ * split 
+ */
   def split(data: ArrayBuffer[ArrayBuffer[Double]], splitFeature: Int, splitPlace: Double): ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]] = {
     var dataR = ArrayBuffer[ArrayBuffer[Double]]()
     var dataL = ArrayBuffer[ArrayBuffer[Double]]()
 
-    println(splitFeature)
-    println(splitPlace)
     for (d <- data) {
       if (d(splitFeature + 1) < splitPlace) {
         dataR += d
@@ -468,5 +450,27 @@ object input {
     result += dataR
     result += dataL
   }
+  
+      //  labeled as which label?  feature? for samples smaller than 'split'
+    def toWhichLabel(feature: ArrayBuffer[Map[Int, ArrayBuffer[Array[Double]]]],splitFeature: Int, splitPlace: Double ): Int = {
+  
+      var labelMap = feature(splitFeature)
+      var histoOne = new Array[Double](labelMap.size)
+      var maxHisto = 0.0
+      var maxIndex = 0
+      var sum = 0.0
+  
+      var i = 0
+      for ((k, v) <- labelMap) {
+        sum = sumPro(v)
+        if (sum > maxHisto) {
+          maxHisto = sum
+          maxIndex = i
+        }
+        i += 1
+      }
+      println("If sample's feature " + splitFeature+ " is smaller than "+splitPlace+" , then it should be labeled as "+ maxIndex)
+      maxIndex
+    }
 
 }
