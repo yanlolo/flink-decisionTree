@@ -1,3 +1,6 @@
+// one round split
+// split the original data 
+
 package input
 
 import scala.io.Source
@@ -17,32 +20,27 @@ object input {
     var data = dataInput("d:/Userfiles/yyan/Desktop/data/data.txt")
     var clsData = dataPro(data)
     var feature = histoPro(clsData, featureNum, numBins)
+    var splitFeature = bestFeatureSplit(feature, numBins, numSplit)(0)
+    var splitPlace = bestFeatureSplit(feature, numBins, numSplit)(1)
+    var ff = split(data, splitFeature.toInt, splitPlace)
+    var dataR = ff(0)
+    var dataL = ff(1)
 
-    //sumPro(feature(0)(0))
-    //uniformPro(feature(0)(0), numSplit)
-    //mergePro(feature(0)(0), feature(0)(1), numSplit)
-    for (i <- 0 to featureNum - 1) {
-      println("                    ")
-      println(" ---- -----feature " + i + "--------- ---- ")
-      var labelMap = feature(i)
-      var histo = ArrayBuffer[Array[Double]]() // merge of histoList
-
-      for ((k, v) <- labelMap) {
-        println(" -----labeled " + k + "--------- ")
-        var histolist = v
-        for (l <- 0 to numBins - 1)
-          println(histolist(l)(0), histolist(l)(1))
-
-        histo = mergePro(histo, histolist, numBins)
+    println("   R   ")
+    for (i <- 0 to dataR.size - 1) {
+      for (j <- 0 to dataR(0).size - 1) {
+        print(dataR(i)(j) + "   ")
       }
-
-      println(" ---- -----histogram for all samples--------- ---- ")
-      for (l <- 0 to numBins - 1)
-        println(histo(l)(0), histo(l)(1))
-        //println(entropy(labelMap))
-      //println(entropy(labelMap, 50 , 0 ))
+      println("      ")
     }
-    bestFeatureSplit(feature, numBins, numSplit)
+    println("   L   ")
+    for (i <- 0 to dataL.size - 1) {
+      for (j <- 0 to dataL(0).size - 1) {
+        print(dataL(i)(j) + "   ")
+      }
+      println("      ")
+    }
+
   }
 
   /* 
@@ -169,19 +167,19 @@ object input {
       feature += labelMap
     }
 
-    //    for (i <- 0 to featureNum - 1) {
-    //      println("                    ")
-    //      println(" ---- -----feature " + i + "--------- ---- ")
-    //      var labelMap = feature(i)
-    //      var histo = ArrayBuffer[Array[Double]]() // merge of histoList
-    //
-    //      for ((k, v) <- labelMap) {
-    //        println(" -----labeled " + k + "--------- ")
-    //        var histolist = v
-    //        for (l <- 0 to numBins - 1)
-    //          println(histolist(l)(0), histolist(l)(1))
-    //      }
-    //    }
+    for (i <- 0 to featureNum - 1) {
+      println("                    ")
+      println(" ---- -----feature " + i + "--------- ---- ")
+      var labelMap = feature(i)
+      var histo = ArrayBuffer[Array[Double]]() // merge of histoList
+
+      for ((k, v) <- labelMap) {
+        println(" -----labeled " + k + "--------- ")
+        var histolist = v
+        for (l <- 0 to numBins - 1)
+          println(histolist(l)(0), histolist(l)(1))
+      }
+    }
     feature
   }
 
@@ -397,7 +395,7 @@ object input {
   def bestFeatureSplit(feature: ArrayBuffer[Map[Int, ArrayBuffer[Array[Double]]]], numBins: Int, numSplit: Int): Array[Double] = {
 
     var maxGain = 0.0
-    var splitplace = 0.0
+    var splitPlace = 0.0
     var splitFeature = 0
     var aa = new Array[Double](2)
     var result = new Array[Double](2)
@@ -406,36 +404,69 @@ object input {
       aa = bestLabelSplit(feature(i), numBins, numSplit)
       if (aa(1) > maxGain) {
         maxGain = aa(1)
-        splitplace = aa(0)
+        splitPlace = aa(0)
         splitFeature = i
       }
     }
 
     result(0) = splitFeature
-    result(1) = splitplace
-    println("Split feature " + splitFeature + " at " + splitplace)
+    result(1) = splitPlace
+    println("Split feature " + splitFeature + " at " + splitPlace)
     result
   }
 
-  //  labeled as which label?  for samples smaller than 'split'
-  def toWhichLabel(labelMap: Map[Int, ArrayBuffer[Array[Double]]]): Int = {
+  //  //  labeled as which label?  feature? for samples smaller than 'split'
+  //  def toWhichLabel(labelMap: Map[Int, ArrayBuffer[Array[Double]]]): Int = {
+  //
+  //    var histoOne = new Array[Double](labelMap.size)
+  //    var maxHisto = 0.0
+  //    var maxIndex = 0
+  //    var sum = 0.0
+  //
+  //    var i = 0
+  //    for ((k, v) <- labelMap) {
+  //      sum = sumPro(v)
+  //      if (sum > maxHisto) {
+  //        maxHisto = sum
+  //        maxIndex = i
+  //      }
+  //      i += 1
+  //    }
+  //    println("labeled as label " + maxIndex)
+  //    maxIndex
+  //  }
 
-    var histoOne = new Array[Double](labelMap.size)
-    var maxHisto = 0.0
-    var maxIndex = 0
-    var sum = 0.0
+  def split(data: ArrayBuffer[ArrayBuffer[Double]], splitFeature: Int, splitPlace: Double): ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]] = {
+    var dataR = ArrayBuffer[ArrayBuffer[Double]]()
+    var dataL = ArrayBuffer[ArrayBuffer[Double]]()
 
-    var i = 0
-    for ((k, v) <- labelMap) {
-      sum = sumPro(v)
-      if (sum > maxHisto) {
-        maxHisto = sum
-        maxIndex = i
+    println(splitFeature)
+    println(splitPlace)
+    for (d <- data) {
+      if (d(splitFeature + 1) < splitPlace) {
+        dataR += d
+      } else {
+        dataL += d
       }
-      i += 1
     }
-    println("labeled as label " + maxIndex)
-    maxIndex
+
+    //    println("   R   ")
+    //    for (i <- 0 to dataR.size - 1) {
+    //      for (j <- 0 to dataR(0).size - 1) {
+    //        print(dataR(i)(j) + "   ")
+    //      }
+    //      println("      ")
+    //    }
+    //    println("   L   ")
+    //    for (i <- 0 to dataL.size - 1) {
+    //      for (j <- 0 to dataL(0).size - 1) {
+    //        print(dataL(i)(j) + "   ")
+    //      }
+    //      println("      ")
+    //    }
+    var result = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
+    result += dataR
+    result += dataL
   }
 
 }
