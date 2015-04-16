@@ -13,8 +13,9 @@ object input {
     val featureNum = 2 // number of independent features
     val numBins = 5 // B bins for Update procedure
     val numSplit = 3 //By default it should be same as numBins
-    val numLevel = 1 // how many levels of tree
+    val numLevel = 2 // how many levels of tree
     val leastSample = 5 // least number of samples in one node
+    var testsppppp = 0
 
     var data = dataInput("d:/Userfiles/yyan/Desktop/data/data.txt")
 
@@ -34,9 +35,10 @@ object input {
         var clsData = dataPro(data)
 
         var feature = histoPro(clsData, featureNum, numBins)
-        var splitFeature = bestFeatureSplit(feature, numBins, numSplit)(0)
-        var splitPlace = bestFeatureSplit(feature, numBins, numSplit)(1)
-        var ff = split(data, splitFeature.toInt, splitPlace)
+        var splitTry = bestFeatureSplit(feature, numBins, numSplit)
+        var splitFeature = splitTry(0).toInt
+        var splitPlace = splitTry(1)
+        var ff = split(data, splitFeature, splitPlace)
         var dataR = ff(0)
         var dataL = ff(1)
         println("   R   ")
@@ -53,7 +55,7 @@ object input {
           }
           println("      ")
         }
-        toWhichLabel(feature, splitFeature.toInt, splitPlace)
+        toWhichLabel(feature, splitFeature, splitPlace)
         tempDataList ++= ff
 
       }
@@ -387,7 +389,7 @@ object input {
       histo = mergePro(histo, v, numBins)
     }
 
-    println(" ---- -----histogram for all samples --------- ---- ")
+    println(" ---- -----histogram for all samples lolo--------- ---- ")
     for (i <- 0 to histo.size - 1) {
       println(histo(i)(0), histo(i)(1))
     }
@@ -426,7 +428,11 @@ object input {
     var result = new Array[Double](2)
 
     for (i <- 0 to feature.size - 1) {
+      println(" ")
+      println("Start to find feature " + i +" 's split")
+      println(" ")
       aa = bestLabelSplit(feature(i), numBins, numSplit)
+      
       if (aa(1) > maxGain) {
         maxGain = aa(1)
         splitPlace = aa(0)
