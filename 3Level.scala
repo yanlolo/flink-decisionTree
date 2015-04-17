@@ -15,22 +15,19 @@ object input {
     val numSplit = 3 //By default it should be same as numBins
     val numLevel = 3 // how many levels of tree
     val leastSample = 5 // least number of samples in one node
-    var testsppppp = 0
-
+  
     var data = dataInput("d:/Userfiles/yyan/Desktop/data/data.txt")
-
-    var dataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
-    dataList += data
     
-
+    var dataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()    
+    dataList += data
     var level = 1
-    while (level <= numLevel) { // loop to build every level
+    while (level <= numLevel) { // Stop condition 1: tree level
       println("     ")
       println("     ")
       println(" Level " + level)
       var tempDataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
       for (data <- dataList) { // loop for current level's nodes
-        if (data.size != 0) {
+        if (data.size >= leastSample) {   // Stop condition 2: number of samples in one node
           println("     ")
           println(" Node ")
           println("     ")
