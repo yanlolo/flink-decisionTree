@@ -21,20 +21,20 @@ object input {
 
     var dataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
     dataList += data
-    var tempDataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
+    
 
     var level = 1
     while (level <= numLevel) { // loop to build every level
       println("     ")
       println("     ")
       println(" Level " + level)
+      var tempDataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
       for (data <- dataList) { // loop for current level's nodes
         if (data.size != 0) {
           println("     ")
           println(" Node ")
           println("     ")
           var clsData = dataPro(data)
-
           var feature = histoPro(clsData, featureNum, numBins)
           var splitTry = bestFeatureSplit(feature, numBins, numSplit)
           var splitFeature = splitTry(0).toInt
