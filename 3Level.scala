@@ -1,5 +1,6 @@
 package input
 
+// keep original data 
 import scala.io.Source
 import collection.mutable.ArrayBuffer
 import math._
@@ -15,10 +16,10 @@ object input {
     val numSplit = 3 //By default it should be same as numBins
     val numLevel = 3 // how many levels of tree
     val leastSample = 5 // least number of samples in one node
-  
+
     var data = dataInput("d:/Userfiles/yyan/Desktop/data/data.txt")
-    
-    var dataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()    
+
+    var dataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
     dataList += data
     var level = 1
     while (level <= numLevel) { // Stop condition 1: tree level
@@ -27,8 +28,8 @@ object input {
       println(" Level " + level)
       var tempDataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
       for (data <- dataList) { // loop for current level's nodes
-        if (data.size >= leastSample) {   // Stop condition 2: number of samples in one node
-          println("     ")
+        if (data.size >= leastSample && numOfLabel(data) > 1) { // Stop condition 2: number of samples in one node 
+          println("     ")                                      // Stop condition 3: all the samples belong to one label
           println(" Node ")
           println("     ")
           var clsData = dataPro(data)
@@ -88,6 +89,17 @@ object input {
       println("      ")
     }
     data
+  }
+
+  /*
+   * number of labels in data set
+   */
+  def numOfLabel(data: ArrayBuffer[ArrayBuffer[Double]]): Int = {
+    var labels = new collection.mutable.HashMap[Double, Int]
+    for (dd <- data) {
+      labels += (dd(0) -> 1)
+    }
+    labels.size
   }
 
   /*  
