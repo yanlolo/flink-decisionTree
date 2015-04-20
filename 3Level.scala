@@ -17,7 +17,7 @@ object input {
     val numLevel = 3 // how many levels of tree
     val leastSample = 5 // least number of samples in one node
 
-    var data = dataInput("d:/Userfiles/yyan/Desktop/data/data.txt")
+    var data = dataInput("d:/Userfiles/yyan/Desktop/data/data.txt", featureNum)
 
     var dataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
     dataList += data
@@ -67,7 +67,7 @@ object input {
   /* 
    * input the data and display
    */
-  def dataInput(s: String): ArrayBuffer[ArrayBuffer[Double]] = {
+  def dataInput(s: String, featureNum:Int): ArrayBuffer[ArrayBuffer[Double]] = {
 
     val lines = Source.fromFile(s).getLines()
     var data = ArrayBuffer[ArrayBuffer[Double]]()
@@ -77,7 +77,9 @@ object input {
       for (num <- nums) {
         numArray += num.toDouble
       }
-      data += numArray
+      if (numArray.size == featureNum+1){  // check if this sample losses any feature record 
+        data += numArray
+      }      
     }
 
     println("label  features")
