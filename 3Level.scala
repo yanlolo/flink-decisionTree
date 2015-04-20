@@ -29,7 +29,7 @@ object input {
       var tempDataList = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
       for (data <- dataList) { // loop for current level's nodes
         if (data.size >= leastSample && numOfLabel(data) > 1) { // Stop condition 2: number of samples in one node 
-          println("     ")                                      // Stop condition 3: all the samples belong to one label
+          println("     ") // Stop condition 3: all the samples belong to one label
           println(" Node ")
           println("     ")
           var clsData = dataPro(data)
@@ -68,10 +68,9 @@ object input {
    * input the data and display
    */
   def dataInput(s: String): ArrayBuffer[ArrayBuffer[Double]] = {
-    var data = ArrayBuffer[ArrayBuffer[Double]]()
-    val source = Source.fromFile(s)
-    val lines = source.getLines()
 
+    val lines = Source.fromFile(s).getLines()
+    var data = ArrayBuffer[ArrayBuffer[Double]]()
     for (line <- lines) {
       val nums = line.toString.split(" ")
       val numArray = ArrayBuffer[Double]()
@@ -102,45 +101,47 @@ object input {
     labels.size
   }
 
-  /*  
+  /* TESTING !!!!!! 
    * process the input data to classify by their features and labels
    */
-  def dataPro(data: ArrayBuffer[ArrayBuffer[Double]]): ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]] = {
-    var clsData = ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]]()
-    var ma00 = ArrayBuffer[Double]()
-    var ma01 = ArrayBuffer[Double]()
-    var ma10 = ArrayBuffer[Double]()
-    var ma11 = ArrayBuffer[Double]()
+  def dataPro(data: ArrayBuffer[ArrayBuffer[Double]]): Array[Map[Double, ArrayBuffer[Double]]] = {
+    // only allocated when data is not empty
 
-    var i = 0
+    var clsData = new Array[Map[Double, ArrayBuffer[Double]]](data(0).size - 1)
+    var labels = new collection.mutable.HashMap[Double, ArrayBuffer[Double]]
+
     for (d <- data) {
-      if (d(0) == 0.0) {
-        ma00 += d(1)
-        ma10 += d(2)
-      } else if (d(0) == 1.0) {
-        ma01 += d(1)
-        ma11 += d(2)
-      }
-    }
-
-    var ma0 = ArrayBuffer[ArrayBuffer[Double]]()
-    var ma1 = ArrayBuffer[ArrayBuffer[Double]]()
-    ma0 += ma00
-    ma0 += ma01
-    ma1 += ma10
-    ma1 += ma11
-
-    clsData += ma0
-    clsData += ma1
-    for (i <- 0 to 1) {
-      for (j <- 0 to 1) {
-        println("feature " + i + " , label " + j + " has " + clsData(i)(j).size + " samples")
-        for (k <- 0 to clsData(i)(j).size - 1) {
-          print(clsData(i)(j)(k) + "  ")
+      for (i <- 0 to clsData.size - 1) {
+        var flag = 0
+        if (clsData(i) == null) {
+          clsData(i) = Map(d(0) -> ArrayBuffer(d(i + 1)))
+        } else {
+          // find the matched key
+          for ((k, v) <- clsData(i)) {
+            if (d(0) == k) {
+              flag = 1
+              v += d(i + 1)
+            }
+          }
+          if (flag == 0) {
+            clsData(i) += (d(0) -> ArrayBuffer(d(i + 1)))
+          }
         }
-        println("      ")
+
       }
     }
+
+    // print 
+    for (i <- 0 to clsData.size - 1) {
+      for ((k, v) <- clsData(i)) {
+        println("Feature " + i + " Label " + k)
+        for (vv <- v) {
+          print(vv + "  ")
+        }
+        println(" ")
+      }
+    }
+
     clsData
   }
 
@@ -185,35 +186,17 @@ object input {
   /*
    * build up all the histograms for every feature, every label
    */
-  def histoPro(clsData: ArrayBuffer[ArrayBuffer[ArrayBuffer[Double]]], featureNum: Int, numBins: Int): ArrayBuffer[Map[Int, ArrayBuffer[Array[Double]]]] = {
+  def histoPro(clsData: Array[Map[Double, ArrayBuffer[Double]]], featureNum: Int, numBins: Int): ArrayBuffer[Map[Int, ArrayBuffer[Array[Double]]]] = {
     var feature = ArrayBuffer[Map[Int, ArrayBuffer[Array[Double]]]]()
-    for (d <- clsData) {
+    var labelHisto = Map[Int, ArrayBuffer[Array[Double]]]()
+
+    for (labelMap <- clsData) {
       var histoList = ArrayBuffer[Array[Double]]()
-      var labelMap = new collection.mutable.HashMap[Int, ArrayBuffer[Array[Double]]]
-      var j = 0
-      for (nums <- d) {
-        //println(" nums size : " + nums.size)
-        histoList = updatePro(nums, numBins)
-        //println(" histo size : " + histoList.size)
-        labelMap += (j -> histoList)
-        j += 1
+      for ((k, v) <- labelMap) {        
+          histoList = updatePro(v, numBins)
+          labelHisto += (k.toInt -> histoList)         
       }
-      feature += labelMap
-    }
-
-    for (i <- 0 to featureNum - 1) {
-      println("                    ")
-      println(" ---- -----feature " + i + "--------- ---- ")
-      var labelMap = feature(i)
-      var histo = ArrayBuffer[Array[Double]]() // merge of histoList
-
-      for ((k, v) <- labelMap) {
-        println(" -----labeled " + k + "--------- ")
-        var histolist = v
-        for (l <- 0 to histolist.size - 1)
-          println(histolist(l)(0), histolist(l)(1))
-      }
-
+     feature += labelHisto
     }
     feature
   }
