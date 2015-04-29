@@ -47,20 +47,12 @@ object WordCount {
 
     //val output = input.groupBy(1).aggregate(Aggregations.SUM, 0).and(Aggregations.MIN, 2)
 
-    val data: DataSet[Sample] = input.map(str => {
-      val elements = str.split(' ')
-      val label = elements(0).toInt
-      //val feature = Array(elements(1).toDouble, elements(2).toDouble)
-      Sample(label, elements(1).toDouble)
-    })
-
-  
-    val histo = data.groupBy(1).sortGroup(0, Order.ASCENDING)
-
+    val sample = input.map{s => (s,1)}
+    //sample(1).foreach(println)
 
    
     // emit result
-   // histo.writeAsCsv(outputPath, "\n", "|")
+    sample.writeAsCsv(outputPath, "\n", "|")
 
     // execute program
     env.execute(" Decision Tree ")
@@ -72,7 +64,7 @@ object WordCount {
 
   private var inputPath: String = null
   private var outputPath: String = null
-  case class Sample(label: Int, feature: Double)
+  case class Sample(label:Int, feature1:Double,feature2:Double)
 
   private def parseParameters(args: Array[String]): Boolean = {
     if (args.length == 2) {
@@ -85,8 +77,39 @@ object WordCount {
     }
   }
 
-  private def getDataSet(env: ExecutionEnvironment): DataSet[String] = {
-    env.readTextFile(inputPath)
+  private def getDataSet(env: ExecutionEnvironment): DataSet[Sample] = {
+        env.readCsvFile[Sample](inputPath, fieldDelimiter = ' ', lineDelimiter = "\n",
+            includedFields = Array(0, 1, 2))
   }
+  
 
 }
+
+
+
+/*
+ * Output
+Sample(0,23.0,10.0)|1
+Sample(0,19.0,11.0)|1
+Sample(0,10.0,12.0)|1
+Sample(0,16.0,13.0)|1
+Sample(0,36.0,14.0)|1
+Sample(1,46.0,80.0)|1
+Sample(1,78.0,81.0)|1
+Sample(1,83.0,82.0)|1
+Sample(1,30.0,83.0)|1
+Sample(1,64.0,84.0)|1
+Sample(0,2.0,15.0)|1
+Sample(0,9.0,16.0)|1
+Sample(0,32.0,17.0)|1
+Sample(0,30.0,18.0)|1
+Sample(0,45.0,19.0)|1
+Sample(1,28.0,85.0)|1
+Sample(1,87.0,86.0)|1
+Sample(1,90.0,87.0)|1
+Sample(1,53.0,88.0)|1
+Sample(1,72.0,89.0)|1
+ */
+
+
+
