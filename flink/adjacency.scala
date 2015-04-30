@@ -7,6 +7,7 @@ import org.apache.flink.api.common.operators.Order
 
 import org.apache.flink.api.common.functions.GroupReduceFunction
 import scala.collection.JavaConverters._
+import java.lang.Iterable
 
 object WordCount {
 
