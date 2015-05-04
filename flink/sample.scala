@@ -1,29 +1,13 @@
 package org.myorg.quickstart
 
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import org.apache.flink.api.scala._
 import org.apache.flink.util.Collector
 import org.apache.flink.api.java.aggregation.Aggregations
 import org.apache.flink.api.common.operators.Order
 
-
+import org.apache.flink.api.common.functions.GroupReduceFunction
+import scala.collection.JavaConverters._
+import java.lang.Iterable
 
 object WordCount {
 
@@ -38,7 +22,7 @@ object WordCount {
     // get customer data set: (custkey, name, address, nationkey, acctbal) 
     val input = getDataSet(env)
 
-    val featureNum = 2 // number of independent features
+    val numFeature = 2 // number of independent features
     val numBins = 5 // B bins for Update procedure
     val numSplit = 3 //By default it should be same as numBins
     val numLevel = 3 // how many levels of tree
@@ -47,12 +31,40 @@ object WordCount {
 
     //val output = input.groupBy(1).aggregate(Aggregations.SUM, 0).and(Aggregations.MIN, 2)
 
-    val sample = input.map{s => (s,1)}.groupBy(0).sum(1)
-    //sample(1).foreach(println)
+    // val samples = input.map { s => (s._1, s._2, 1) }
+    //   .groupBy(0)
+    //   .reduce { (s1, s2) => (s1._1, s1._2 + s2._2, s1._3 + s2._3) }
 
-   
+    val samples = input.map { s => Sample(s._1, s._2) }
+
+    val numSample = input.map { s => (s._1, 1) }.groupBy(0).sum(1)
+
+    val adjacencySamples = samples
+      .groupBy("label").reduceGroup(new GroupReduceFunction[Sample, AdjacencySample] {
+        override def reduce(values: Iterable[Sample], out: Collector[AdjacencySample]): Unit = {
+          var outputId = 0
+          val outputList = values.asScala map { t => outputId = t.label; new Histo(t.feature, 1) }
+          out.collect(new AdjacencySample(outputId, outputList))
+        }
+      })
+//
+//    val result = numSample.join(adjacencySamples).where(0).equalTo("label") {
+//      (num, adjacenct, out: AdjacencySample) =>
+//        adjacenct.iterator(num - numBins) {
+//
+//        }
+//
+//    }
+
+    //    val ss = adjacencySamples {
+    //      (a, out: Collector[Sample]) =>
+    //        val label = a.label
+    //        val features = a.features
+    //        a.features foreach { t => out.collect(Sample(label, t)) }
+    //    }
+
     // emit result
-    sample.writeAsCsv(outputPath, "\n", "|")
+    adjacencySamples.writeAsCsv(outputPath, "\n", "|")
 
     // execute program
     env.execute(" Decision Tree ")
@@ -64,12 +76,17 @@ object WordCount {
 
   private var inputPath: String = null
   private var outputPath: String = null
-  case class Sample(label:Int, feature1:Double,feature2:Double)
+
+  case class Sample(label: Int, feature: Double)
+  case class Histo(value: Double, frequent: Double)
+  case class AdjacencySample(label: Int, features: scala.collection.Iterable[Histo])
 
   private def parseParameters(args: Array[String]): Boolean = {
+    println(" start parse")
     if (args.length == 2) {
       inputPath = args(0)
       outputPath = args(1)
+      println(" stop parse")
       true
     } else {
       System.err.println("This program expects data from the TPC-H benchmark as input data.\n")
@@ -77,35 +94,13 @@ object WordCount {
     }
   }
 
-  private def getDataSet(env: ExecutionEnvironment): DataSet[Sample] = {
-        env.readCsvFile[Sample](inputPath, fieldDelimiter = ' ', lineDelimiter = "\n",
-            includedFields = Array(0, 1, 2))
+  private def getDataSet(env: ExecutionEnvironment): DataSet[(Int, Double)] = {
+    env.readCsvFile[(Int, Double)](inputPath, fieldDelimiter = ' ', lineDelimiter = "\n",
+      includedFields = Array(0, 1))
   }
-  
 
 }
 
-/*
- * Output
-Sample(0,2.0,15.0)|1
-Sample(0,9.0,16.0)|1
-Sample(0,10.0,12.0)|1
-Sample(0,16.0,13.0)|1
-Sample(0,19.0,11.0)|1
-Sample(0,23.0,10.0)|3
-Sample(0,30.0,18.0)|1
-Sample(0,32.0,17.0)|1
-Sample(0,36.0,14.0)|1
-Sample(0,45.0,19.0)|1
-Sample(1,28.0,85.0)|1
-Sample(1,30.0,83.0)|1
-Sample(1,46.0,80.0)|1
-Sample(1,53.0,88.0)|1
-Sample(1,64.0,84.0)|1
-Sample(1,72.0,89.0)|1
-Sample(1,78.0,81.0)|1
-Sample(1,83.0,82.0)|1
-Sample(1,87.0,86.0)|1
-Sample(1,90.0,87.0)|1
- */
+//0|List(Histo(23.0,1.0), Histo(19.0,1.0), Histo(10.0,1.0), Histo(16.0,1.0), Histo(36.0,1.0), Histo(2.0,1.0), Histo(9.0,1.0), Histo(32.0,1.0), Histo(30.0,1.0), Histo(45.0,1.0))
+//1|List(Histo(46.0,1.0), Histo(78.0,1.0), Histo(83.0,1.0), Histo(30.0,1.0), Histo(64.0,1.0), Histo(28.0,1.0), Histo(87.0,1.0), Histo(90.0,1.0), Histo(53.0,1.0), Histo(72.0,1.0))
 
