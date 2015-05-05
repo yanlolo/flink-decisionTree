@@ -52,8 +52,8 @@ object WordCount {
 
     val result = numSample.join(adjacencySamples).where(0).equalTo("label") {
       (num, adjacenct, out: Collector[AdjacencySample]) =>
-        val aa = adjacenct.features.map{s =>(s,1)}
-        val b = aa.sortPartition(0._1,Order.ASCENDING).setParallelism(1)
+        val aa = adjacenct.features
+        val b = aa.toList.sortBy(_.value)
         val label = adjacenct.label
         out.collect(new AdjacencySample(label, b))
     }
@@ -67,7 +67,7 @@ object WordCount {
   }
 
   // *************************************************************************
-  //     UTIL METHODS
+  //  UTIL METHODS
   // *************************************************************************
 
   private var inputPath: String = null
