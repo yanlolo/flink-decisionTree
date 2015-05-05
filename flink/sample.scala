@@ -49,37 +49,24 @@ object WordCount {
     val sortedSample = numSample.join(adjacencySamples).where(0).equalTo("label") {
       (num, adjacenct, out: Collector[AdjacencySample]) =>
         val label = adjacenct.label
-        val features = adjacenct.features.toList.sortBy(-_.value) //descending
+        var features = adjacenct.features.toList.sortBy(-_.value) //descending
 
-        var minIndex = 0
-        var minValue = Integer.MAX_VALUE.toDouble
-        for (i <- 0 to features.size - 2) {
-          if (features(i).value - features(i + 1).value < minValue) {
-            minIndex = i
-            minValue = features(i).value - features(i + 1).value
+        for (j <- 0 to num._2 - numBins - 1) {
+          var minIndex = 0
+          var minValue = Integer.MAX_VALUE.toDouble
+          for (i <- 0 to features.size - 2) {
+            if (features(i).value - features(i + 1).value < minValue) {
+              minIndex = i
+              minValue = features(i).value - features(i + 1).value
+            }
           }
+          val newfrequent = features(minIndex).frequent + features(minIndex + 1).frequent
+          val newValue = (features(minIndex).value * features(minIndex).frequent + features(minIndex + 1).value * features(minIndex + 1).frequent) / newfrequent
+          val newFea = features.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ features.drop(minIndex + 2)
+          features = newFea
         }
-
-        val newfrequent = features(minIndex).frequent + features(minIndex + 1).frequent
-        val newValue = (features(minIndex).value * features(minIndex).frequent + features(minIndex + 1).value * features(minIndex + 1).frequent) / newfrequent 
-        val newFea = features.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ features.drop(minIndex + 2)
-
-        out.collect(new AdjacencySample(label, newFea))
+        out.collect(new AdjacencySample(label, features))
     }
-
-    //    val histo = numSample.join(adjacencySamples).where(0).equalTo("label") {
-    //      (num, adjacenct, out: Collector[AdjacencySample]) =>
-    //        val label = adjacenct.label
-    //        val features = adjacenct.features.toList.sortBy(-_.value)
-    //        println(" -----------------features----------------" + features(0))
-    //        
-    //                val finalFea = features.iterate(features.length-numBins){
-    //                  currentFea =>
-    //                    val newFea = currentFea
-    //                }
-    //
-    //        out.collect(new AdjacencySample(label, features))
-    //    }
 
     // emit result
     sortedSample.writeAsCsv(outputPath, "\n", "|")
@@ -107,7 +94,7 @@ object WordCount {
       println(" stop parse")
       true
     } else {
-      System.err.println("This program expects data from the TPC-H benchmark as input data.\n")
+      System.err.println("Please set input/output path. \n")
       false
     }
   }
@@ -120,5 +107,5 @@ object WordCount {
 
 }
 
-//0.0|List(Histo(45.0,1.0), Histo(36.0,1.0), Histo(32.0,1.0), Histo(30.0,1.0), Histo(23.0,1.0), Histo(19.0,1.0), Histo(16.0,1.0), Histo(9.5,2.0), Histo(2.0,1.0))
-//1.0|List(Histo(90.0,1.0), Histo(87.0,1.0), Histo(83.0,1.0), Histo(78.0,1.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(53.0,1.0), Histo(46.0,1.0), Histo(29.0,2.0))
+//0.0|List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0))//
+//1.0|List(Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0))
