@@ -35,7 +35,9 @@ object WordCount {
     //   .groupBy(0)
     //   .reduce { (s1, s2) => (s1._1, s1._2 + s2._2, s1._3 + s2._3) }
 
-    val samples = input.map { s => Sample(s._1, s._2) }
+    val samples = input.map { s => new Sample(s._1, s._2) }
+
+    //val test = samples.sortPartition("feature",Order.ASCENDING).setParallelism(1)
 
     val numSample = input.map { s => (s._1, 1) }.groupBy(0).sum(1)
 
@@ -47,24 +49,18 @@ object WordCount {
           out.collect(new AdjacencySample(outputId, outputList))
         }
       })
-//
-//    val result = numSample.join(adjacencySamples).where(0).equalTo("label") {
-//      (num, adjacenct, out: AdjacencySample) =>
-//        adjacenct.iterator(num - numBins) {
-//
-//        }
-//
-//    }
 
-    //    val ss = adjacencySamples {
-    //      (a, out: Collector[Sample]) =>
-    //        val label = a.label
-    //        val features = a.features
-    //        a.features foreach { t => out.collect(Sample(label, t)) }
-    //    }
+    val result = numSample.join(adjacencySamples).where(0).equalTo("label") {
+      (num, adjacenct, out: Collector[AdjacencySample]) =>
+        val aa = adjacenct.features.map{s =>(s,1)}
+        val b = aa.sortPartition(0._1,Order.ASCENDING).setParallelism(1)
+        val label = adjacenct.label
+        out.collect(new AdjacencySample(label, b))
+    }
+
 
     // emit result
-    adjacencySamples.writeAsCsv(outputPath, "\n", "|")
+    result.writeAsCsv(outputPath, "\n", "|")
 
     // execute program
     env.execute(" Decision Tree ")
@@ -95,7 +91,8 @@ object WordCount {
   }
 
   private def getDataSet(env: ExecutionEnvironment): DataSet[(Int, Double)] = {
-    env.readCsvFile[(Int, Double)](inputPath, fieldDelimiter = ' ', lineDelimiter = "\n",
+    println(" start input")
+    env.readCsvFile[(Int, Double)](inputPath, fieldDelimiter = " ", lineDelimiter = "\n",
       includedFields = Array(0, 1))
   }
 
