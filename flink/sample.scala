@@ -50,17 +50,16 @@ object WordCount {
         }
       })
 
-    val result = numSample.join(adjacencySamples).where(0).equalTo("label") {
-      (num, adjacenct, out: Collector[AdjacencySample]) =>
-        val aa = adjacenct.features
-        val b = aa.toList.sortBy(_.value)
+    val sortedSample = numSample.join(adjacencySamples).where(0).equalTo("label") {
+      (num, adjacenct, out: Collector[AdjacencySample]) =>  
         val label = adjacenct.label
-        out.collect(new AdjacencySample(label, b))
+        val features = adjacenct.features.toList.sortBy(_.value)       
+        out.collect(new AdjacencySample(label, features))
     }
 
 
     // emit result
-    result.writeAsCsv(outputPath, "\n", "|")
+    sortedSample.writeAsCsv(outputPath, "\n", "|")
 
     // execute program
     env.execute(" Decision Tree ")
