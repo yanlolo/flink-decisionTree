@@ -96,9 +96,47 @@ object WordCount {
         out.collect(new AdjacencySample(label, features))
     }
 
+    val test = numSample.join(updatedSample).where(0).equalTo("label") {
+      (num, sample, out: Collector[Double]) =>
+        var features = sample.features.toList.sortBy(_.value) //ascend
+        val len = features.length
+
+        val b = 15 // parameter
+        var i = 0
+        var s = 0.0
+        var result = 0.0
+
+        if (len == 0) {
+          result = 0.0
+        } else if (b >= features(len - 1).value) {
+          result = num._2
+        } else if (b < features(0).value) {
+          result = 0.0
+        } else {
+          while (b >= features(i).value) {
+            i += 1
+          }
+          i -= 1
+
+          val mi = features(i).frequent
+          val mii = features(i + 1).frequent
+          val pi = features(i).value
+          val pii = features(i + 1).value
+          val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
+          s = (mi + mb) * (b - pi) / (2 * (pii - pi))
+
+          for (j <- 0 to i - 1) {
+            s += features(j).frequent
+          }
+          s += features(i).frequent / 2
+
+        }
+        out.collect(s)
+    }
+
     // emit result
-    mergedSample.writeAsCsv(outputPath, "\n", "|")
-    //numLabel.writeAsText(outputPath)
+    //test.writeAsCsv(outputPath, "\n", "|")
+    test.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
@@ -141,3 +179,6 @@ object WordCount {
 
 //2|List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0), Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0))
 //0.0|List(Histo(84.5,4.0), Histo(68.0,2.0), Histo(48.0,3.0), Histo(26.75,8.0), Histo(7.0,3.0))
+
+//3.2750646365986786
+//0.0
