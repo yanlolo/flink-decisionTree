@@ -35,7 +35,9 @@ object WordCount {
 
     //val test = samples.sortPartition("feature",Order.ASCENDING).setParallelism(1)
 
-    val numSample = input.map { s => (s._1, 1) }.groupBy(0).sum(1)
+    val numSample = input.map { s => (s._1, 1) }.groupBy(0).sum(1) //grouped by label
+
+    val numLabel = numSample.map { s => 1 }.reduce(_ + _)
 
     val adjacencySamples = samples
       .groupBy("label").reduceGroup(new GroupReduceFunction[Sample, AdjacencySample] {
@@ -46,7 +48,7 @@ object WordCount {
         }
       })
 
-    val sortedSample = numSample.join(adjacencySamples).where(0).equalTo("label") {
+    val updatedSample = numSample.join(adjacencySamples).where(0).equalTo("label") {
       (num, adjacenct, out: Collector[AdjacencySample]) =>
         val label = adjacenct.label
         var features = adjacenct.features.toList.sortBy(-_.value) //descending
@@ -68,8 +70,35 @@ object WordCount {
         out.collect(new AdjacencySample(label, features))
     }
 
+    val preMergedSample = updatedSample.map { s => (1, s.features) }
+      .reduce((s1, s2) => (s1._1 + s2._1, s1._2 ++ s2._2))
+
+    val mergedSample = preMergedSample.join(preMergedSample).where(0).equalTo(0) {
+      (merged, tt, out: Collector[AdjacencySample]) =>
+        val label = 0.0
+        var features = merged._2.toList.sortBy(-_.value)
+        val len = features.length
+
+        for (j <- 0 to len - numBins - 1) {
+          var minIndex = 0
+          var minValue = Integer.MAX_VALUE.toDouble
+          for (i <- 0 to features.size - 2) {
+            if (features(i).value - features(i + 1).value < minValue) {
+              minIndex = i
+              minValue = features(i).value - features(i + 1).value
+            }
+          }
+          val newfrequent = features(minIndex).frequent + features(minIndex + 1).frequent
+          val newValue = (features(minIndex).value * features(minIndex).frequent + features(minIndex + 1).value * features(minIndex + 1).frequent) / newfrequent
+          val newFea = features.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ features.drop(minIndex + 2)
+          features = newFea
+        }
+        out.collect(new AdjacencySample(label, features))
+    }
+
     // emit result
-    sortedSample.writeAsCsv(outputPath, "\n", "|")
+    mergedSample.writeAsCsv(outputPath, "\n", "|")
+    //numLabel.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
@@ -109,3 +138,6 @@ object WordCount {
 
 //0.0|List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0))//
 //1.0|List(Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0))
+
+//2|List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0), Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0))
+//0.0|List(Histo(84.5,4.0), Histo(68.0,2.0), Histo(48.0,3.0), Histo(26.75,8.0), Histo(7.0,3.0))
