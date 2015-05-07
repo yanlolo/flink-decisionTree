@@ -21,7 +21,7 @@ object WordCount {
     // get execution environment
     val env = ExecutionEnvironment.getExecutionEnvironment
 
-    // get customer data set: (custkey, name, address, nationkey, acctbal) 
+    // get data set
     val input = getDataSet(env)
 
     val numFeature = 2 // number of independent features
@@ -29,27 +29,25 @@ object WordCount {
     val numSplit = 3 //By default it should be same as numBins
     val numLevel = 3 // how many levels of tree
     val leastSample = 5 // least number of samples in one node
-    println("-- Welcom to Decision Tree --")
 
-    //val output = input.groupBy(1).aggregate(Aggregations.SUM, 0).and(Aggregations.MIN, 2)
+    println("-- Welcom to Decision Tree --")
 
     val samples = input.map { s => new Sample(s._1, s._2) }
 
-    //val test = samples.sortPartition("feature",Order.ASCENDING).setParallelism(1)
-
-    val totalSamples = input.map { s => 1 }.reduce(_ + _)
-    val totalSample = totalSamples.map { s => (0.0, s) }
-
-    val numSample = input.map { s => (s._1, 1) }.groupBy(0).sum(1) //grouped by label
-
-    val numLabel = numSample.map { s => 1 }.reduce(_ + _)
-
-    val total = totalSamples.cross(numSample)
+    val numSampleByLabel = samples.map { s => (s.label, 1) }.groupBy(0).sum(1) //grouped by label
+    //(0.0, 10)
+    //(1.0, 10)
+    val numLabel = numSampleByLabel.map { s => 1 }.reduce(_ + _)
+    //2
+    val numSample = numSampleByLabel.map { s => s._2 }.reduce(_ + _)
+    //20
+    val totalSample = numSample.cross(numSampleByLabel)
     //(20,(0.0,10))
     //(20,(1.0,10))
 
-    val entropy = total.map { s => s._2._2.toDouble / s._1 }
+    val entropy = totalSample.map { s => s._2._2.toDouble / s._1 }
       .reduce((s1, s2) => (-s1 * log(s1) - s2 * log(s2)))
+    // 0.6931471805599453
 
     val adjacencySamples = samples
       .groupBy("label").reduceGroup(new GroupReduceFunction[Sample, AdjacencySample] {
@@ -59,8 +57,10 @@ object WordCount {
           out.collect(new AdjacencySample(outputId, outputList))
         }
       })
+    //AdjacencySample(0.0,List(Histo(23.0,1.0), Histo(19.0,1.0), Histo(10.0,1.0), Histo(16.0,1.0), Histo(36.0,1.0), Histo(2.0,1.0), Histo(9.0,1.0), Histo(32.0,1.0), Histo(30.0,1.0), Histo(45.0,1.0)))
+    //AdjacencySample(1.0,List(Histo(46.0,1.0), Histo(78.0,1.0), Histo(83.0,1.0), Histo(30.0,1.0), Histo(64.0,1.0), Histo(28.0,1.0), Histo(87.0,1.0), Histo(90.0,1.0), Histo(53.0,1.0), Histo(72.0,1.0)))
 
-    val updatedSample = numSample.join(adjacencySamples).where(0).equalTo("label") {
+    val updatedSample = numSampleByLabel.join(adjacencySamples).where(0).equalTo("label") {
       (num, adjacenct, out: Collector[AdjacencySample]) =>
         val label = adjacenct.label
         var features = adjacenct.features.toList.sortBy(-_.value) //descending
@@ -81,6 +81,8 @@ object WordCount {
         }
         out.collect(new AdjacencySample(label, features))
     }
+    //AdjacencySample(0.0,List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0)))
+    //AdjacencySample(1.0,List(Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0)))
 
     val preMergedSample = updatedSample.map { s => (1, s.features) }
       .reduce((s1, s2) => (s1._1 + s2._1, s1._2 ++ s2._2))
@@ -107,46 +109,10 @@ object WordCount {
         }
         out.collect(new AdjacencySample(label, features))
     }
+    //AdjacencySample(0.0,List(Histo(84.5,4.0), Histo(68.0,2.0), Histo(48.0,3.0), Histo(26.75,8.0), Histo(7.0,3.0)))
 
-    val sum = numSample.join(updatedSample).where(0).equalTo("label") {
-      (num, sample, out: Collector[Double]) =>
-        val features = sample.features.toList.sortBy(_.value) //ascend
-        val len = features.length
-
-        val b = 15 // parameter
-        var i = 0
-        var s = 0.0
-        var result = 0.0
-
-        if (len == 0) {
-          result = 0.0
-        } else if (b >= features(len - 1).value) {
-          result = num._2
-        } else if (b < features(0).value) {
-          result = 0.0
-        } else {
-          while (b >= features(i).value) {
-            i += 1
-          }
-          i -= 1
-
-          val mi = features(i).frequent
-          val mii = features(i + 1).frequent
-          val pi = features(i).value
-          val pii = features(i + 1).value
-          val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
-          s = (mi + mb) * (b - pi) / (2 * (pii - pi))
-
-          for (j <- 0 to i - 1) {
-            s += features(j).frequent
-          }
-          s += features(i).frequent / 2
-
-        }
-        out.collect(s)
-    }
-
-    val uniform = mergedSample.join(totalSample).where(0).equalTo(0) {
+     val tt = numSample.map { s => (0.0, s) }
+    val uniform = mergedSample.join(tt).where(0).equalTo(0) {
       (sample, tt, out: Collector[List[Double]]) =>
         val features = sample.features.toList.sortBy(_.value) //ascend
 
@@ -183,10 +149,52 @@ object WordCount {
         }
         out.collect(u.toList)
     }
+    //List(25.91607980660953, 53.839743969093604)
+    
+    
+    //    val sum = numSample.join(updatedSample).where(0).equalTo("label") {
+    //      (num, sample, out: Collector[Double]) =>
+    //        val features = sample.features.toList.sortBy(_.value) //ascend
+    //        val len = features.length
+    //
+    //        val b = 15 // parameter
+    //        var i = 0
+    //        var s = 0.0
+    //        var result = 0.0
+    //
+    //        if (len == 0) {
+    //          result = 0.0
+    //        } else if (b >= features(len - 1).value) {
+    //          result = num._2
+    //        } else if (b < features(0).value) {
+    //          result = 0.0
+    //        } else {
+    //          while (b >= features(i).value) {
+    //            i += 1
+    //          }
+    //          i -= 1
+    //
+    //          val mi = features(i).frequent
+    //          val mii = features(i + 1).frequent
+    //          val pi = features(i).value
+    //          val pii = features(i + 1).value
+    //          val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
+    //          s = (mi + mb) * (b - pi) / (2 * (pii - pi))
+    //
+    //          for (j <- 0 to i - 1) {
+    //            s += features(j).frequent
+    //          }
+    //          s += features(i).frequent / 2
+    //
+    //        }
+    //        out.collect(s)
+    //    }
+
+   
 
     // emit result
     //test.writeAsCsv(outputPath, "\n", "|")
-    entropy.writeAsText(outputPath)
+    uniform.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
