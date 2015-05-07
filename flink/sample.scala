@@ -37,11 +37,19 @@ object WordCount {
 
     //val test = samples.sortPartition("feature",Order.ASCENDING).setParallelism(1)
 
-    val totalSample = input.map { s => 1 }.reduce(_ + _).map { s => (0.0, s) }
+    val totalSamples = input.map { s => 1 }.reduce(_ + _)
+    val totalSample = totalSamples.map { s => (0.0, s) }
 
     val numSample = input.map { s => (s._1, 1) }.groupBy(0).sum(1) //grouped by label
 
     val numLabel = numSample.map { s => 1 }.reduce(_ + _)
+
+    val total = totalSamples.cross(numSample)
+    //(20,(0.0,10))
+    //(20,(1.0,10))
+
+    val entropy = total.map { s => s._2._2.toDouble / s._1 }
+      .reduce((s1, s2) => (-s1 * log(s1) - s2 * log(s2)))
 
     val adjacencySamples = samples
       .groupBy("label").reduceGroup(new GroupReduceFunction[Sample, AdjacencySample] {
@@ -100,7 +108,7 @@ object WordCount {
         out.collect(new AdjacencySample(label, features))
     }
 
-    val test = numSample.join(updatedSample).where(0).equalTo("label") {
+    val sum = numSample.join(updatedSample).where(0).equalTo("label") {
       (num, sample, out: Collector[Double]) =>
         val features = sample.features.toList.sortBy(_.value) //ascend
         val len = features.length
@@ -173,14 +181,12 @@ object WordCount {
             u(j - 1) = features(i).value + (features(i + 1).value - features(i).value) * z
           }
         }
-
         out.collect(u.toList)
-
     }
 
     // emit result
     //test.writeAsCsv(outputPath, "\n", "|")
-    uniform.writeAsText(outputPath)
+    entropy.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
@@ -224,5 +230,9 @@ object WordCount {
 //2|List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0), Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0))
 //0.0|List(Histo(84.5,4.0), Histo(68.0,2.0), Histo(48.0,3.0), Histo(26.75,8.0), Histo(7.0,3.0))
 
+//sum
 //3.2750646365986786
 //0.0
+
+//uniform
+//List(25.91607980660953, 53.839743969093604)
