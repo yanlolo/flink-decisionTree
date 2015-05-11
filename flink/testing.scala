@@ -152,10 +152,6 @@ object WordCount {
     }
     //List(25.91607980660953, 53.839743969093604)
 
-    //    val preSplit = uniform.cross(updatedSample)
-    //    //(List(25.91607980660953, 53.839743969093604),AdjacencySample(0.0,List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0))))
-    //    //(List(25.91607980660953, 53.839743969093604),AdjacencySample(1.0,List(Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0))))
-
     val preSplit = numSampleByLabel.cross(uniform).map { s => new Test(s._1._1, s._1._2, s._2) }
     //((0.0, 10, List(25.91607980660953, 53.839743969093604))
     //((1.0, 10, List(25.91607980660953, 53.839743969093604))
@@ -221,51 +217,6 @@ object WordCount {
   case class Histo(value: Double, frequent: Double)
   case class AdjacencySample(label: Double, features: scala.collection.Iterable[Histo])
   case class Test(label: Double, frequent: Double, uniform: List[Double])
-
-  //  class AdjacencySample(label: Double, features: scala.collection.Iterable[Histo]) extends Serializable {
-  //    def this() {
-  //      this(0, null)
-  //    }
-  //
-  //    def sumPro(other: Double): Double = {
-  //      val features: List[Histo] = features.toList.sortBy(_.value) //ascend
-  //      val len = features.length
-  //
-  //      val b = 15 // parameter
-  //      var i = 0
-  //      var s = 0.0
-  //
-  //      if (len == 0) {
-  //        s = 0.0
-  //      } else if (b >= features(len - 1).value) {
-  //        for (j <- 0 to len - 1) {
-  //          s += features(j).frequent
-  //        }
-  //      } else if (b < features(0).value) {
-  //        s = 0.0
-  //      } else {
-  //        while (b >= features(i).value) {
-  //          i += 1
-  //        }
-  //        i -= 1
-  //
-  //        val mi = features(i).frequent
-  //        val mii = features(i + 1).frequent
-  //        val pi = features(i).value
-  //        val pii = features(i + 1).value
-  //        val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
-  //        s = (mi + mb) * (b - pi) / (2 * (pii - pi))
-  //
-  //        for (j <- 0 to i - 1) {
-  //          s += features(j).frequent
-  //        }
-  //        s += features(i).frequent / 2
-  //
-  //      }
-  //      s
-  //
-  //    }
-  //  }
 
   private def parseParameters(args: Array[String]): Boolean = {
     println(" start parse")
