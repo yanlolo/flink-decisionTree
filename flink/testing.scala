@@ -157,7 +157,7 @@ object WordCount {
     //((1.0, 10, List(25.91607980660953, 53.839743969093604))
 
     val sum = preSum.join(updatedSample).where("label").equalTo("label") {
-      (num, sample, out: Collector[List[Double]]) =>
+      (num, sample, out: Collector[(Double, List[Double])]) =>
         val label = sample.label
         val features = sample.features.toList.sortBy(_.value) //ascend
         val len = features.length
@@ -195,37 +195,59 @@ object WordCount {
           k += 1
         }
 
-        out.collect(s.toList)
+        out.collect((label, s.toList))
     }
-    //List(5.981117956487145, 10.0)
-    //List(0.0, 3.553797318644815)
+    //(0.0, List(5.981117956487145, 10.0))
+    //(1.0, List(0.0, 3.553797318644815))
 
-    val entropy0 = sum.map(s => (s(0), s(1)))
-    //   val entropy = totalSample.map { s => s._2._2.toDouble / s._1 }
-    //  .reduce((s1, s2) => (-s1 * log(s1) - s2 * log(s2)))
-    val entropy1 = entropy0.reduce((s1, s2) => (s1._1 + s2._1, s1._2 + s2._2))
-    val entropy2 = entropy0.cross(entropy1).map { s => (s._1._1 / s._2._1, s._1._2 / s._2._2) }
-    //(1.0, 0.7378006152005714)
-    //(0.0, 0.26219938479942856)
+    val entropyLeft0 = sum.map(s => (s._1, s._2(0), s._2(1)))
+    val entropyLeft1 = entropyLeft0.map(s => (s._2, s._3)).reduce((s1, s2) => (s1._1 + s2._1, s1._2 + s2._2))
+    val entropyLeft2 = entropyLeft0.cross(entropyLeft1).map { s => (s._1._1, s._1._2 / s._2._1, s._1._3 / s._2._2) }
+    //(0.0,1.0,0.7378006152005714)
+    //(1.0,0.0,0.26219938479942856)
 
-    val entropy3 = entropy2.map { s =>
+    val entropyLeft3 = entropyLeft2.map { s =>
       var x = 0.0
       var y = 0.0
-      if (s._1 == 0)
-        x = 0
-      else x = -s._1 * log(s._1)
       if (s._2 == 0)
+        x = 0
+      else x = -s._2 * log(s._2)
+      if (s._3 == 0)
         y = 0
-      else y = -s._2 * log(s._2)
-      (x, y)
+      else y = -s._3 * log(s._3)
+      (s._1, x, y)
     }
-    //(-0.0, 0.22435163581096879)
-    //(0.0, 0.3509932206095104)
-    
+    //(0.0, -0.0, 0.22435163581096879)
+    //(1.0, 0.0, 0.3509932206095104)
 
+    val gainLeft = entropyLeft3.map(s => (s._2, s._3)).reduce((s1, s2) => (s1._1 + s2._1, s1._2 + s2._2))
+    //(0.0,0.5753448564204792)
+
+    val entropyRight0 = entropyLeft0.join(numSampleByLabel).where(0).equalTo(0)
+      .map { s => (s._1._1, s._2._2 - s._1._2, s._2._2 - s._1._3) }
+    //(0.0, 4.018882043512855, 0.0)
+    //(1.0, 10.0, 6.446202681355185)
+    val entropyRight1 = entropyRight0.map(s => (s._2, s._3)).reduce((s1, s2) => (s1._1 + s2._1, s1._2 + s2._2))
+    val entropyRight2 = entropyRight0.cross(entropyRight1).map { s => (s._1._1, s._1._2 / s._2._1, s._1._3 / s._2._2) }
+    val entropyRight3 = entropyRight2.map { s =>
+      var x = 0.0
+      var y = 0.0
+      if (s._2 == 0)
+        x = 0
+      else x = -s._2 * log(s._2)
+      if (s._3 == 0)
+        y = 0
+      else y = -s._3 * log(s._3)
+      (s._1, x, y)
+    }
+    val gainRight = entropyRight3.map(s => (s._2, s._3)).reduce((s1, s2) => (s1._1 + s2._1, s1._2 + s2._2))
+    //(0.5991488600923703, 0.0)
+
+    val gainInfor = ...
+    
     // emit result
     //test.writeAsCsv(outputPath, "\n", "|")
-    entropy3.writeAsText(outputPath)
+    gainRight.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
