@@ -152,11 +152,11 @@ object WordCount {
     }
     //List(25.91607980660953, 53.839743969093604)
 
-    val preSplit = numSampleByLabel.cross(uniform).map { s => new Test(s._1._1, s._1._2, s._2) }
+    val preSum = numSampleByLabel.cross(uniform).map { s => new Test(s._1._1, s._1._2, s._2) }
     //((0.0, 10, List(25.91607980660953, 53.839743969093604))
     //((1.0, 10, List(25.91607980660953, 53.839743969093604))
 
-    val sum = preSplit.join(updatedSample).where("label").equalTo("label") {
+    val sum = preSum.join(updatedSample).where("label").equalTo("label") {
       (num, sample, out: Collector[List[Double]]) =>
         val label = sample.label
         val features = sample.features.toList.sortBy(_.value) //ascend
@@ -200,9 +200,32 @@ object WordCount {
     //List(5.981117956487145, 10.0)
     //List(0.0, 3.553797318644815)
 
+    val entropy0 = sum.map(s => (s(0), s(1)))
+    //   val entropy = totalSample.map { s => s._2._2.toDouble / s._1 }
+    //  .reduce((s1, s2) => (-s1 * log(s1) - s2 * log(s2)))
+    val entropy1 = entropy0.reduce((s1, s2) => (s1._1 + s2._1, s1._2 + s2._2))
+    val entropy2 = entropy0.cross(entropy1).map { s => (s._1._1 / s._2._1, s._1._2 / s._2._2) }
+    //(1.0, 0.7378006152005714)
+    //(0.0, 0.26219938479942856)
+
+    val entropy3 = entropy2.map { s =>
+      var x = 0.0
+      var y = 0.0
+      if (s._1 == 0)
+        x = 0
+      else x = -s._1 * log(s._1)
+      if (s._2 == 0)
+        y = 0
+      else y = -s._2 * log(s._2)
+      (x, y)
+    }
+    //(-0.0, 0.22435163581096879)
+    //(0.0, 0.3509932206095104)
+    
+
     // emit result
     //test.writeAsCsv(outputPath, "\n", "|")
-    sum.writeAsText(outputPath)
+    entropy3.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
