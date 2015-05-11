@@ -158,20 +158,21 @@ object WordCount {
 
     val sum = preSplit.join(updatedSample).where("label").equalTo("label") {
       (num, sample, out: Collector[List[Double]]) =>
+        val label = sample.label
         val features = sample.features.toList.sortBy(_.value) //ascend
         val len = features.length
         var s = new Array[Double](num.uniform.length)
-        
-        var j = 0
+
+        var k = 0
         for (b <- num.uniform) {
           var i = 0
 
           if (len == 0) {
-            s(j) = 0.0
+            s(k) = 0.0
           } else if (b >= features(len - 1).value) {
-            s(j) = num.frequent
+            s(k) = num.frequent
           } else if (b < features(0).value) {
-            s(j) = 0.0
+            s(k) = 0.0
           } else {
             while (b >= features(i).value) {
               i += 1
@@ -183,24 +184,25 @@ object WordCount {
             val pi = features(i).value
             val pii = features(i + 1).value
             val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
-            s(j) = (mi + mb) * (b - pi) / (2 * (pii - pi))
+            s(k) = (mi + mb) * (b - pi) / (2 * (pii - pi))
 
             for (j <- 0 to i - 1) {
-              s(j) += features(j).frequent
+              s(k) += features(j).frequent
             }
-            s(j) += features(i).frequent / 2
+            s(k) += features(i).frequent / 2
 
           }
+          k += 1
         }
 
         out.collect(s.toList)
     }
-    //3.2750646365986786
-    //0.0
+    //List(5.981117956487145, 10.0)
+    //List(0.0, 3.553797318644815)
 
     // emit result
     //test.writeAsCsv(outputPath, "\n", "|")
-    updatedSample.writeAsText(outputPath)
+    sum.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
