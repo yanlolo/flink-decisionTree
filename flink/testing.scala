@@ -152,81 +152,59 @@ object WordCount {
     }
     //List(25.91607980660953, 53.839743969093604)
 
-    val preSplit = uniform.cross(updatedSample)
-    //(List(25.91607980660953, 53.839743969093604),AdjacencySample(0.0,List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0))))
-    //(List(25.91607980660953, 53.839743969093604),AdjacencySample(1.0,List(Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0))))
+    //    val preSplit = uniform.cross(updatedSample)
+    //    //(List(25.91607980660953, 53.839743969093604),AdjacencySample(0.0,List(Histo(45.0,1.0), Histo(32.666666666666664,3.0), Histo(19.333333333333332,3.0), Histo(9.5,2.0), Histo(2.0,1.0))))
+    //    //(List(25.91607980660953, 53.839743969093604),AdjacencySample(1.0,List(Histo(84.5,4.0), Histo(72.0,1.0), Histo(64.0,1.0), Histo(49.5,2.0), Histo(29.0,2.0))))
 
-    //val test = updatedSample.map(s => s.sumPro(15))
-    //    val split = updatedSample.map(new SelectNearestCenter).withBroadcastSet(uniform, "uniforms")
-    //
-    //    final class SelectNearestCenter extends RichMapFunction[AdjacencySample, Double] {
-    //      private var uniforms: Traversable[List[Double]] = null
-    //
-    //      /** Reads the uniform values from a broadcast variable into a collection. */
-    //      override def open(parameters: Configuration) {
-    //        uniforms = getRuntimeContext.getBroadcastVariable[List[Double]]("uniforms").asScala
-    //      }
-    //
-    //      def map(p: AdjacencySample): Double = {
-    //        var maxGain: Double = Double.MinValue
-    //        var gain: Double = 0.0
-    //        var splitValue: Double = 0.0
-    //        for (uniform <- uniforms) {
-    //          for (uu <- uniform) {
-    //            var gain = p.informationGain(uu)
-    //            if (gain > maxGain) {
-    //              maxGain = gain
-    //              splitValue = uu
-    //            }
-    //          }
-    //        }
-    //        splitValue
-    //      }
-    //
-    //    }
-    val sum = numSampleByLabel.join(updatedSample).where(0).equalTo("label") {
-      (num, sample, out: Collector[Double]) =>
+    val preSplit = numSampleByLabel.cross(uniform).map { s => new Test(s._1._1, s._1._2, s._2) }
+    //((0.0, 10, List(25.91607980660953, 53.839743969093604))
+    //((1.0, 10, List(25.91607980660953, 53.839743969093604))
+
+    val sum = preSplit.join(updatedSample).where("label").equalTo("label") {
+      (num, sample, out: Collector[List[Double]]) =>
         val features = sample.features.toList.sortBy(_.value) //ascend
         val len = features.length
+        var s = new Array[Double](num.uniform.length)
+        
+        var j = 0
+        for (b <- num.uniform) {
+          var i = 0
 
-        val b = 15 // parameter
-        var i = 0
-        var s = 0.0
-        var result = 0.0
+          if (len == 0) {
+            s(j) = 0.0
+          } else if (b >= features(len - 1).value) {
+            s(j) = num.frequent
+          } else if (b < features(0).value) {
+            s(j) = 0.0
+          } else {
+            while (b >= features(i).value) {
+              i += 1
+            }
+            i -= 1
 
-        if (len == 0) {
-          result = 0.0
-        } else if (b >= features(len - 1).value) {
-          result = num._2
-        } else if (b < features(0).value) {
-          result = 0.0
-        } else {
-          while (b >= features(i).value) {
-            i += 1
+            val mi = features(i).frequent
+            val mii = features(i + 1).frequent
+            val pi = features(i).value
+            val pii = features(i + 1).value
+            val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
+            s(j) = (mi + mb) * (b - pi) / (2 * (pii - pi))
+
+            for (j <- 0 to i - 1) {
+              s(j) += features(j).frequent
+            }
+            s(j) += features(i).frequent / 2
+
           }
-          i -= 1
-
-          val mi = features(i).frequent
-          val mii = features(i + 1).frequent
-          val pi = features(i).value
-          val pii = features(i + 1).value
-          val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
-          s = (mi + mb) * (b - pi) / (2 * (pii - pi))
-
-          for (j <- 0 to i - 1) {
-            s += features(j).frequent
-          }
-          s += features(i).frequent / 2
-
         }
-        out.collect(s)
+
+        out.collect(s.toList)
     }
     //3.2750646365986786
     //0.0
 
     // emit result
     //test.writeAsCsv(outputPath, "\n", "|")
-    sum.writeAsText(outputPath)
+    updatedSample.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
@@ -242,6 +220,7 @@ object WordCount {
   case class Sample(label: Double, feature: Double)
   case class Histo(value: Double, frequent: Double)
   case class AdjacencySample(label: Double, features: scala.collection.Iterable[Histo])
+  case class Test(label: Double, frequent: Double, uniform: List[Double])
 
   //  class AdjacencySample(label: Double, features: scala.collection.Iterable[Histo]) extends Serializable {
   //    def this() {
