@@ -4,12 +4,11 @@ import org.apache.flink.api.scala._
 import org.apache.flink.util.Collector
 import org.apache.flink.api.java.aggregation.Aggregations
 import org.apache.flink.api.common.operators.Order
-
 import org.apache.flink.api.common.functions._
 import org.apache.flink.configuration.Configuration
+
 import scala.collection.JavaConverters._
 import java.lang.Iterable
-
 import math._
 
 object WordCount {
@@ -24,12 +23,6 @@ object WordCount {
 
     // get data set
     val input = getDataSet(env)
-
-    val numFeature = 2 // number of independent features
-    val numBins = 5 // B bins for Update procedure
-    val numSplit = 3 //By default it should be same as numBins
-    val numLevel = 3 // how many levels of tree
-    val leastSample = 5 // least number of samples in one node
 
     println("-- Welcom to Decision Tree --")
 
@@ -269,6 +262,11 @@ object WordCount {
 
   private var inputPath: String = null
   private var outputPath: String = null
+  private val numFeature = 2 // number of independent features
+  private val numBins = 5 // B bins for Update procedure
+  private val numSplit = 3 //By default it should be same as numBins
+  private val numLevel = 3 // how many levels of tree
+  private val leastSample = 5 // least number of samples in one node
 
   case class Sample(label: Double, feature: Double)
   case class Histo(value: Double, frequent: Double)
