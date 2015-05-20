@@ -109,7 +109,7 @@ object WordCount {
         }
     }
 
-    val adjacencySample: DataSet[Histogram] = doneSample.groupBy("label", "featureIndex") reduce {
+    val updatedSample: DataSet[Histogram] = doneSample.groupBy("label", "featureIndex") reduce {
       (h1, h2) => //new Histogram(h1.label, h1.featureIndex, List(Histo(h1.histo(0).featureValue, h1.histo(0).frequency+h2.histo(0).frequency)))
         {
           var re = new Histogram(0, 0, null)
@@ -132,10 +132,41 @@ object WordCount {
               h = newFea
             }
             re = new Histogram(h1.label, h1.featureIndex, h)
-          }         
+          }
           re
         }
     }
+
+    val mergedSample = updatedSample.map { s => new MergedHisto(s.featureIndex, s.histo) }
+      .groupBy("featureIndex") reduce {
+        (h1, h2) =>
+          {
+            var re = new MergedHisto(0, null)
+            var h = h1.histo ++ h2.histo
+            if (h.size <= numBins) {
+              re = new MergedHisto(h1.featureIndex, h)
+            } else {
+              while (h.size > numBins) {
+                var minIndex = 0
+                var minValue = Integer.MAX_VALUE.toDouble
+                for (i <- 0 to h.size - 2) {
+                  if (h(i).featureValue - h(i + 1).featureValue < minValue) {
+                    minIndex = i
+                    minValue = h(i).featureValue - h(i + 1).featureValue
+                  }
+                }
+                val newfrequent = h(minIndex).frequency + h(minIndex + 1).frequency
+                val newValue = (h(minIndex).featureValue * h(minIndex).frequency + h(minIndex + 1).featureValue * h(minIndex + 1).frequency) / newfrequent
+                val newFea = h.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ h.drop(minIndex + 2)
+                h = newFea
+              }
+              re = new MergedHisto(h1.featureIndex, h)
+            }
+            re
+          }
+      }
+      
+      
 
     val numSample: DataSet[Int] = labledSample.map { s => 1 }.reduce(_ + _)
     //1483
@@ -146,7 +177,7 @@ object WordCount {
 
     // emit result
     //sample.writeAsCsv(outputPath, "\n", "|")
-    adjacencySample.writeAsText(outputPath)
+    mergedSample.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
@@ -166,6 +197,7 @@ object WordCount {
 
   case class Histo(featureValue: Double, frequency: Double)
   case class Histogram(label: Double, featureIndex: Int, histo: List[Histo])
+  case class MergedHisto(featureIndex: Int, histo: List[Histo])
   //case class Histograms(label: Double, featureIndex: Int, histos: scala.collection.Iterable[Histo])
   case class LabeledVector(label: Double, feature: List[Double])
 
