@@ -27,6 +27,7 @@ object WordCount {
     // get data set
     val input = getDataSet(env)
     val sample: DataSet[String] = input.flatMap { _.split("\n") } filter { _.nonEmpty }
+    //val sampleTotal: DataSet[Int] = sample.map { s => 1 }.reduce(_ + _)
     val nonEmptysample1: DataSet[List[String]] = sample.map { s => s.split("\t").toList }.filter { !_.contains("") }
 
     def toDouble1(c: Char): Double = {
@@ -98,12 +99,54 @@ object WordCount {
     }
 
     val labledSample: DataSet[LabeledVector] = nonEmptysample.map { s =>
-      new LabeledVector(s(0), s.drop(1))
+      new LabeledVector(s(0), s.drop(1).take(13))
     }
+
+    val doneSample: DataSet[Histogram] = labledSample.flatMap {
+      s =>
+        (0 until s.feature.size) map {
+          index => new Histogram(s.label, index, List(Histo(s.feature(index), 1)))
+        }
+    }
+
+    val adjacencySample: DataSet[Histogram] = doneSample.groupBy("label", "featureIndex") reduce {
+      (h1, h2) => //new Histogram(h1.label, h1.featureIndex, List(Histo(h1.histo(0).featureValue, h1.histo(0).frequency+h2.histo(0).frequency)))
+        {
+          var re = new Histogram(0, 0, null)
+          var h = h1.histo ++ h2.histo
+          if (h.size <= numBins) {
+            re = new Histogram(h1.label, h1.featureIndex, h)
+          } else {
+            while (h.size > numBins) {
+              var minIndex = 0
+              var minValue = Integer.MAX_VALUE.toDouble
+              for (i <- 0 to h.size - 2) {
+                if (h(i).featureValue - h(i + 1).featureValue < minValue) {
+                  minIndex = i
+                  minValue = h(i).featureValue - h(i + 1).featureValue
+                }
+              }
+              val newfrequent = h(minIndex).frequency + h(minIndex + 1).frequency
+              val newValue = (h(minIndex).featureValue * h(minIndex).frequency + h(minIndex + 1).featureValue * h(minIndex + 1).frequency) / newfrequent
+              val newFea = h.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ h.drop(minIndex + 2)
+              h = newFea
+            }
+            re = new Histogram(h1.label, h1.featureIndex, h)
+          }         
+          re
+        }
+    }
+
+    val numSample: DataSet[Int] = labledSample.map { s => 1 }.reduce(_ + _)
+    //1483
+
+    val numSampleByLabel: DataSet[(Double, Int)] = labledSample.map { s => (s.label, 1) }.groupBy(0).sum(1)
+    //(0.0, 1033)
+    //(1.0, 450)
 
     // emit result
     //sample.writeAsCsv(outputPath, "\n", "|")
-    labledSample.writeAsText(outputPath)
+    adjacencySample.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
@@ -121,25 +164,10 @@ object WordCount {
   private val numLevel = 3 // how many levels of tree
   private val leastSample = 5 // least number of samples in one node
 
-  case class LabeledVector(label: Double, feature: List[Double]) extends Vector
-  //
-  //    override def equals(obj: Any): Boolean = {
-  //      obj match {
-  //        case labeledVector: LabeledVector =>
-  //          vector.equals(labeledVector.vector) && label.equals(labeledVector.label)
-  //        case _ => false
-  //      }
-  //    }
-  //
-  //    override def toString: String = {
-  //      s"LabeledVector($label, $vector)"
-  //    }
-
-  //
-  //  case class Sample(label: Double, feature: Double)
-  //  case class Histo(value: Double, frequent: Double)
-  //  case class AdjacencySample(label: Double, features: scala.collection.Iterable[Histo])
-  //  case class Test(label: Double, frequent: Double, uniform: List[Double])
+  case class Histo(featureValue: Double, frequency: Double)
+  case class Histogram(label: Double, featureIndex: Int, histo: List[Histo])
+  //case class Histograms(label: Double, featureIndex: Int, histos: scala.collection.Iterable[Histo])
+  case class LabeledVector(label: Double, feature: List[Double])
 
   private def parseParameters(args: Array[String]): Boolean = {
     println(" start parse")
