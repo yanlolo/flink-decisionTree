@@ -137,7 +137,7 @@ object WordCount {
         }
     }
 
-    val mergedSample = updatedSample.map { s => new MergedHisto(s.featureIndex, s.histo) }
+    val mergedSample: DataSet[MergedHisto] = updatedSample.map { s => new MergedHisto(s.featureIndex, s.histo) }
       .groupBy("featureIndex") reduce {
         (h1, h2) =>
           {
@@ -162,14 +162,54 @@ object WordCount {
               }
               re = new MergedHisto(h1.featureIndex, h)
             }
-            re
+            //re.histo.toList.sortBy(_.featureValue) 
+            new MergedHisto(re.featureIndex, re.histo.toList.sortBy(_.featureValue)) //ascend
           }
       }
-      
-      
-
     val numSample: DataSet[Int] = labledSample.map { s => 1 }.reduce(_ + _)
     //1483
+
+    val uniform: DataSet[Uniform] = numSample.cross(mergedSample).map {
+      sample =>
+        val histo = sample._2.histo //ascend
+        val len = histo.length
+        var u = new Array[Double](numSplit - 1)
+
+        for (j <- 1 to numSplit - 1) {
+          var s = j * sample._1 / numSplit.toDouble
+
+          if (s <= histo(0).frequency) {
+            u(j - 1) = histo(0).featureValue
+          } else {
+            val totalSum = (0 until len) map { index => histo(index).frequency } reduce { _ + _ }
+            val extendSum = totalSum - histo(len - 1).frequency / 2
+            if (s >= extendSum) {
+              u(j - 1) = histo(len - 1).featureValue
+            } else {
+              var i = 0
+              var sumP = 0.0
+              //sumPro
+              while (sumP < s) {
+                if (i == 0)
+                  sumP += histo(i).frequency / 2
+                else
+                  sumP += histo(i).frequency / 2 + histo(i - 1).frequency / 2
+                i += 1
+              }
+              i -= 2
+
+              var d = s - (sumP - histo(i + 1).frequency / 2 - histo(i).frequency / 2)
+              var a = histo(i + 1).frequency - histo(i).frequency
+              var b = 2 * histo(i).frequency
+              var c = -2 * d
+              var z = if (a == 0) -c / b else (-b + sqrt(pow(b, 2) - 4 * a * c)) / (2 * a)
+
+              u(j - 1) = histo(i).featureValue + (histo(i + 1).featureValue - histo(i).featureValue) * z
+            }
+          }
+        }
+        new Uniform(sample._2.featureIndex, u.toList)
+    }
 
     val numSampleByLabel: DataSet[(Double, Int)] = labledSample.map { s => (s.label, 1) }.groupBy(0).sum(1)
     //(0.0, 1033)
@@ -177,7 +217,7 @@ object WordCount {
 
     // emit result
     //sample.writeAsCsv(outputPath, "\n", "|")
-    mergedSample.writeAsText(outputPath)
+    uniform.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
@@ -198,7 +238,7 @@ object WordCount {
   case class Histo(featureValue: Double, frequency: Double)
   case class Histogram(label: Double, featureIndex: Int, histo: List[Histo])
   case class MergedHisto(featureIndex: Int, histo: List[Histo])
-  //case class Histograms(label: Double, featureIndex: Int, histos: scala.collection.Iterable[Histo])
+  case class Uniform(featureIndex: Int, uniform: List[Double])
   case class LabeledVector(label: Double, feature: List[Double])
 
   private def parseParameters(args: Array[String]): Boolean = {
