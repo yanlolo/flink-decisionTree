@@ -107,58 +107,73 @@ object WordCount {
         }
     }
 
-    val updatedSample: DataSet[Histogram] = doneSample.groupBy("label", "featureIndex") reduce {
-      (h1, h2) =>
-        var re = new Histogram(0, 0, null)
-        var h = (h1.histo ++ h2.histo).toList.sortBy(_.featureValue) //accend
+    //    def add(h1: Histogram, h2: Histogram): Histogram = {
+    //      val h = new Histogram(h1.label, h1.featureIndex, h1.histo ++ h2.histo)
+    //      h
+    //    }
+    //
+    //    val test = doneSample.groupBy("label", "featureIndex") reduce {
+    //      (h1, h2) => add(h1, h2)
+    //    }
 
-        if (h.size <= numBins) {
-          re = new Histogram(h1.label, h1.featureIndex, h)
-        } else {
-          while (h.size > numBins) {
-            var minIndex = 0
-            var minValue = Integer.MAX_VALUE.toDouble
-            for (i <- 0 to h.size - 2) {
-              if (h(i + 1).featureValue - h(i).featureValue < minValue) {
-                minIndex = i
-                minValue = h(i + 1).featureValue - h(i).featureValue
-              }
+    def update(h1: Histogram, h2: Histogram): Histogram = {
+      var re = new Histogram(0, 0, null)
+      var h = (h1.histo ++ h2.histo).toList.sortBy(_.featureValue) //accend
+
+      if (h.size <= numBins) {
+        re = new Histogram(h1.label, h1.featureIndex, h)
+      } else {
+        while (h.size > numBins) {
+          var minIndex = 0
+          var minValue = Integer.MAX_VALUE.toDouble
+          for (i <- 0 to h.size - 2) {
+            if (h(i + 1).featureValue - h(i).featureValue < minValue) {
+              minIndex = i
+              minValue = h(i + 1).featureValue - h(i).featureValue
             }
-            val newfrequent = h(minIndex).frequency + h(minIndex + 1).frequency
-            val newValue = (h(minIndex).featureValue * h(minIndex).frequency + h(minIndex + 1).featureValue * h(minIndex + 1).frequency) / newfrequent
-            val newFea = h.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ h.drop(minIndex + 2)
-            h = newFea
           }
-          re = new Histogram(h1.label, h1.featureIndex, h)
+          val newfrequent = h(minIndex).frequency + h(minIndex + 1).frequency
+          val newValue = (h(minIndex).featureValue * h(minIndex).frequency + h(minIndex + 1).featureValue * h(minIndex + 1).frequency) / newfrequent
+          val newFea = h.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ h.drop(minIndex + 2)
+          h = newFea
         }
-        re
+        re = new Histogram(h1.label, h1.featureIndex, h)
+      }
+      re
+    }
+
+    val updatedSample: DataSet[Histogram] = doneSample.groupBy("label", "featureIndex") reduce {
+      (h1, h2) => update(h1, h2)
+    }
+
+    def merge(m1: MergedHisto, m2: MergedHisto): MergedHisto = {
+      var re = new MergedHisto(0, null)
+      var h = (m1.histo ++ m2.histo).toList.sortBy(_.featureValue) //accend
+      if (h.size <= numBins) {
+        re = new MergedHisto(m1.featureIndex, h)
+      } else {
+        while (h.size > numBins) {
+          var minIndex = 0
+          var minValue = Integer.MAX_VALUE.toDouble
+          for (i <- 0 to h.size - 2) {
+            if (h(i + 1).featureValue - h(i).featureValue < minValue) {
+              minIndex = i
+              minValue = h(i + 1).featureValue - h(i).featureValue
+            }
+          }
+          val newfrequent = h(minIndex).frequency + h(minIndex + 1).frequency
+          val newValue = (h(minIndex).featureValue * h(minIndex).frequency + h(minIndex + 1).featureValue * h(minIndex + 1).frequency) / newfrequent
+          val newFea = h.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ h.drop(minIndex + 2)
+          h = newFea
+        }
+        re = new MergedHisto(m1.featureIndex, h)
+      }
+      re
     }
 
     val mergedSample: DataSet[MergedHisto] = updatedSample.map { s => new MergedHisto(s.featureIndex, s.histo) }
       .groupBy("featureIndex") reduce {
-        (h1, h2) =>
-          var re = new MergedHisto(0, null)
-          var h = (h1.histo ++ h2.histo).toList.sortBy(_.featureValue) //accend
-          if (h.size <= numBins) {
-            re = new MergedHisto(h1.featureIndex, h)
-          } else {
-            while (h.size > numBins) {
-              var minIndex = 0
-              var minValue = Integer.MAX_VALUE.toDouble
-              for (i <- 0 to h.size - 2) {
-                if (h(i + 1).featureValue - h(i).featureValue < minValue) {
-                  minIndex = i
-                  minValue = h(i + 1).featureValue - h(i).featureValue
-                }
-              }
-              val newfrequent = h(minIndex).frequency + h(minIndex + 1).frequency
-              val newValue = (h(minIndex).featureValue * h(minIndex).frequency + h(minIndex + 1).featureValue * h(minIndex + 1).frequency) / newfrequent
-              val newFea = h.take(minIndex) ++ List(Histo(newValue, newfrequent)) ++ h.drop(minIndex + 2)
-              h = newFea
-            }
-            re = new MergedHisto(h1.featureIndex, h)
-          }
-          re
+        (m1, m2) => merge(m1, m2)
       }
 
     val numSample: DataSet[Int] = labledSample.map { s => 1 }.reduce(_ + _)
@@ -279,19 +294,20 @@ object WordCount {
       }
       re
     }
-
-    val entroy3 = entropy2.groupBy("featureIndex") reduce {
-      (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => entropy(e) + entropy(h2.uniform(i)) })
-    }
+    //
+    //    val entropy3 = entropy2.groupBy("featureIndex") reduce {
+    //      (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => entropy(e) + entropy(h2.uniform(i)) })
+    //    }
 
     // emit result
-    //sample.writeAsCsv(outputPath, "\n", "|")
+    //test.writeAsText("/home/hadoop/Desktop/test/test")
     updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
     mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
-    uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
-    sum.writeAsText("/home/hadoop/Desktop/test/sum")
-    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
-    entropy2.writeAsText("/home/hadoop/Desktop/test/entropy2")
+    //    uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
+    //    sum.writeAsText("/home/hadoop/Desktop/test/sum")
+    //    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
+    //    entropy2.writeAsText("/home/hadoop/Desktop/test/entropy2")
+    //    entropy3.writeAsText("/home/hadoop/Desktop/test/entropy3")
     //entropy2.writeAsText(outputPath)
 
     // execute program
