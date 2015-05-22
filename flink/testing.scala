@@ -11,8 +11,6 @@ import scala.collection.JavaConverters._
 import java.lang.Iterable
 import math._
 
-import org.myorg.quickstart.Vector
-
 object WordCount {
 
   def main(args: Array[String]) {
@@ -208,7 +206,7 @@ object WordCount {
         new Uniform(sample._2.featureIndex, u.toList)
     }
 
-    val sum = uniform.join(updatedSample).where("featureIndex").equalTo("featureIndex") {
+    val sum: DataSet[Sum] = uniform.join(updatedSample).where("featureIndex").equalTo("featureIndex") {
       (uni, updatedSample, out: Collector[Sum]) =>
         val label = updatedSample.label
         val featureIndex = updatedSample.featureIndex
@@ -256,9 +254,45 @@ object WordCount {
     //(0.0, 1033)
     //(1.0, 450)
 
+    val entropy = sum.groupBy("featureIndex") reduce {
+      (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => e + h2.uniform(i) })
+    }
+
+    val entropy2 = sum.join(entropy).where("featureIndex").equalTo("featureIndex")
+      .map { s =>
+        new Sum(s._1.label, s._1.featureIndex, s._1.uniform.zipWithIndex.map {
+          case (e, i) =>
+            var re = 0.0
+            if (s._2.uniform(i) == 0) {
+              re = 0.0
+            } else {
+              re = e / s._2.uniform(i)
+            }
+            re
+        })
+      }
+
+    def entroy(q: Double): Double = {
+      var re = 0.0
+      if (q >= 0) {
+        re = -q * log(q)
+      }
+      re
+    }
+
+    val entroy3 = entropy2.groupBy("featureIndex") reduce {
+      (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => entropy(e) + entropy(h2.uniform(i)) })
+    }
+
     // emit result
     //sample.writeAsCsv(outputPath, "\n", "|")
-    sum.writeAsText(outputPath)
+    updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
+    mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
+    uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
+    sum.writeAsText("/home/hadoop/Desktop/test/sum")
+    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
+    entropy2.writeAsText("/home/hadoop/Desktop/test/entropy2")
+    //entropy2.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
