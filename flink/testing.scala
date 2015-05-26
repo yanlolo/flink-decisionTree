@@ -150,16 +150,21 @@ object WordCount {
         })
       }
 
-    def entroy(q: Double): Double = {
-      var re = 0.0
-      if (q >= 0) {
-        re = -q * log(q)
-      }
-      re
-    }
-
     val entropy3 = entropy2.groupBy("featureIndex") reduce {
-      (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => entropy(e) + entropy(h2.uniform(i)) })
+      (h1, h2) =>
+        new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map {
+          case (e, i) =>
+            var a = 0.0
+            if (e > 0) {
+              a = -e * log(e)
+            }
+
+            var b = 0.0
+            if (h2.uniform(i) > 0) {
+              b = -h2.uniform(i) * log(h2.uniform(i))
+            }
+            a + b
+        })
     }
 
     // emit result
@@ -168,9 +173,9 @@ object WordCount {
     mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
     uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
     sum.writeAsText("/home/hadoop/Desktop/test/sum")
-    //    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
-    //    entropy2.writeAsText("/home/hadoop/Desktop/test/entropy2")
-    //    entropy3.writeAsText("/home/hadoop/Desktop/test/entropy3")
+    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
+    entropy2.writeAsText("/home/hadoop/Desktop/test/entropy2")
+    entropy3.writeAsText("/home/hadoop/Desktop/test/entropy3")
     //entropy2.writeAsText(outputPath)
 
     // execute program
