@@ -132,50 +132,15 @@ object WordCount {
     //(0.0, 1033)
     //(1.0, 450)
 
-    val entropy = sum.groupBy("featureIndex") reduce {
-      (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => e + h2.uniform(i) })
-    }
-
-    val entropy2 = sum.join(entropy).where("featureIndex").equalTo("featureIndex")
-      .map { s =>
-        new Sum(s._1.label, s._1.featureIndex, s._1.uniform.zipWithIndex.map {
-          case (e, i) =>
-            var re = 0.0
-            if (s._2.uniform(i) == 0) {
-              re = 0.0
-            } else {
-              re = e / s._2.uniform(i)
-            }
-            re
-        })
-      }
-
-    val entropy3 = entropy2.groupBy("featureIndex") reduce {
-      (h1, h2) =>
-        new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map {
-          case (e, i) =>
-            var a = 0.0
-            if (e > 0) {
-              a = -e * log(e)
-            }
-
-            var b = 0.0
-            if (h2.uniform(i) > 0) {
-              b = -h2.uniform(i) * log(h2.uniform(i))
-            }
-            a + b
-        })
-    }
-
+    val entropy = entropyCal(sum)
+    
+    
     // emit result
-    //test.writeAsText("/home/hadoop/Desktop/test/test")
     updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
     mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
     uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
     sum.writeAsText("/home/hadoop/Desktop/test/sum")
     entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
-    entropy2.writeAsText("/home/hadoop/Desktop/test/entropy2")
-    entropy3.writeAsText("/home/hadoop/Desktop/test/entropy3")
     //entropy2.writeAsText(outputPath)
 
     // execute program
@@ -363,6 +328,48 @@ object WordCount {
       k += 1
     }
     new Sum(label, featureIndex, s.toList)
+  }
+
+  /*
+   * calculate the entropy
+   */
+  def entropyCal(sum: DataSet[Sum]): DataSet[Sum] = {
+
+    val entropy: DataSet[Sum] = sum.groupBy("featureIndex") reduce {
+      (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => e + h2.uniform(i) })
+    }
+
+    val entropy2: DataSet[Sum] = sum.join(entropy).where("featureIndex").equalTo("featureIndex")
+      .map { s =>
+        new Sum(s._1.label, s._1.featureIndex, s._1.uniform.zipWithIndex.map {
+          case (e, i) =>
+            var re = 0.0
+            if (s._2.uniform(i) == 0) {
+              re = 0.0
+            } else {
+              re = e / s._2.uniform(i)
+            }
+            re
+        })
+      }
+
+    val entropy3: DataSet[Sum] = entropy2.groupBy("featureIndex") reduce {
+      (h1, h2) =>
+        new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map {
+          case (e, i) =>
+            var a = 0.0
+            if (e > 0) {
+              a = -e * log(e)
+            }
+
+            var b = 0.0
+            if (h2.uniform(i) > 0) {
+              b = -h2.uniform(i) * log(h2.uniform(i))
+            }
+            a + b
+        })
+    }
+    entropy3
   }
 
 }
