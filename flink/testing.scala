@@ -128,25 +128,44 @@ object WordCount {
         out.collect(sumPro(uni, updatedSample))
     }
 
-    val numSampleByLabel: DataSet[(Double, Int)] = labledSample.map { s => (s.label, 1) }.groupBy(0).sum(1)
-    //(0.0, 1033)
-    //(1.0, 450)
+    val gain = gainCal(labledSample, sum)
 
-    val entropy = entropyCal(sum)
-    
-    
+    val splitPlace = gain.map {
+      s =>
+        val feature = s._2
+        var min = Integer.MAX_VALUE.toDouble
+        for (i <- 0 until feature.length) {
+          if (feature(i) < min) {
+            min = feature(i)
+          }
+        }
+        (s._1, min)
+    }.reduce { (s1, s2) =>
+      var re = (0, 0.0)
+      if (s1._2 <= s2._2)
+        re = s1
+      else
+        re = s2
+      re
+    }
+
     // emit result
-    updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
-    mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
-    uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
-    sum.writeAsText("/home/hadoop/Desktop/test/sum")
-    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
+    //    updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
+    //    mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
+    //    uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
+    //sum.writeAsText("/home/hadoop/Desktop/test/sum")
+    //    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
+    //    entropyLeft.writeAsText("/home/hadoop/Desktop/test/entropyLeft")
+    //    sumRight.writeAsText("/home/hadoop/Desktop/test/sumRight")
+    //    entropyRight.writeAsText("/home/hadoop/Desktop/test/entropyRight")
+    gain.writeAsText("/home/hadoop/Desktop/test/gain")
+    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
+
     //entropy2.writeAsText(outputPath)
 
     // execute program
     env.execute(" Decision Tree ")
   }
-
   // *************************************************************************
   //  UTIL METHODS
   // *************************************************************************
@@ -333,7 +352,7 @@ object WordCount {
   /*
    * calculate the entropy
    */
-  def entropyCal(sum: DataSet[Sum]): DataSet[Sum] = {
+  def entropyLeftCal(sum: DataSet[Sum]): DataSet[Sum] = {
 
     val entropy: DataSet[Sum] = sum.groupBy("featureIndex") reduce {
       (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => e + h2.uniform(i) })
@@ -369,7 +388,75 @@ object WordCount {
             a + b
         })
     }
+
     entropy3
+  }
+
+  def entropyCal(numSampleByLabel: DataSet[(Double, Double)]): DataSet[(Double, Double)] = {
+    val entropy: DataSet[(Double, Double)] = numSampleByLabel.reduce {
+      (h1, h2) => (0, h1._2 + h2._2)
+    }
+
+    val entropy2: DataSet[(Double, Double)] = numSampleByLabel.cross(entropy).map {
+      s => (s._1._1, s._1._2 / s._2._2)
+    }
+
+    val entropy3: DataSet[(Double, Double)] = entropy2.reduce {
+      (h1, h2) =>
+        {
+          var a = 0.0
+          if (h1._2 > 0) {
+            a = -h1._2 * log(h1._2)
+          }
+
+          var b = 0.0
+          if (h2._2 > 0) {
+            b = -h2._2 * log(h2._2)
+          }
+          (0, a + b)
+        }
+    }
+    entropy3
+  }
+
+  /*
+   * define gain calculate
+   */
+  def gainCal(labledSample: DataSet[LabeledVector], sum: DataSet[Sum]): DataSet[(Int, List[Double])] = {
+
+    val numSampleByLabel: DataSet[(Double, Double)] = labledSample.map { s => (s.label, 1) }.groupBy(0).sum(1)
+      .map(s => (s._1, s._2.toDouble))
+    //(0.0, 1033)
+    //(1.0, 450)
+
+    val entropy = entropyCal(numSampleByLabel)
+    val entropyLeft = entropyLeftCal(sum)
+    val sumRight = sum.map { s => (s.label, s.featureIndex.toDouble, s.uniform) }
+      .join(numSampleByLabel).where(1).equalTo(0) {
+        (sum, numSampleByLabel, out: Collector[Sum]) =>
+          out.collect(new Sum(sum._1, sum._2.toInt, sum._3.zipWithIndex.map { case (e, i) => numSampleByLabel._2 - e }))
+      }
+    val entropyRight = entropyLeftCal(sumRight)
+
+    val delta1: DataSet[Sum] = sum.groupBy("featureIndex") reduce {
+      (h1, h2) => new Sum(0, h1.featureIndex, h1.uniform.zipWithIndex.map { case (e, i) => e + h2.uniform(i) })
+    }
+
+    val totalSample = labledSample.map { s => 1 }.reduce(_ + _)
+
+    val delta = delta1.cross(totalSample).map {
+      s => (s._1.featureIndex, s._1.uniform.zipWithIndex.map { case (e, i) => e / s._2 })
+    }
+
+    val gain = entropyLeft.join(entropyRight).where("label", "featureIndex").equalTo("label", "featureIndex").map {
+      s => (s._1.featureIndex, s._1.uniform, s._2.uniform)
+    }.join(delta).where(0).equalTo(0).cross(entropy).map {
+      s =>
+        (s._1._1._1, s._1._1._2.zipWithIndex.map {
+          case (e, i) => s._2._2 - s._1._2._2(i) * e - (1 - s._1._2._2(i)) * s._1._1._3(i)
+        })
+    }
+    gain
   }
 
 }
