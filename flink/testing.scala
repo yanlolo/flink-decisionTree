@@ -130,24 +130,32 @@ object WordCount {
 
     val gain = gainCal(labledSample, sum)
 
-    val splitPlace = gain.map {
+    val splitPlace1 = gain.map {
       s =>
         val feature = s._2
-        var min = Integer.MAX_VALUE.toDouble
+        var max = Integer.MIN_VALUE.toDouble
+        var maxIndex = 0
         for (i <- 0 until feature.length) {
-          if (feature(i) < min) {
-            min = feature(i)
+          if (feature(i) > max) {
+            max = feature(i)
+            maxIndex = i
           }
         }
-        (s._1, min)
+        (s._1, maxIndex)
     }.reduce { (s1, s2) =>
-      var re = (0, 0.0)
+      var re = (0, 0)
       if (s1._2 <= s2._2)
-        re = s1
-      else
         re = s2
+      else
+        re = s1
       re
     }
+
+    val splitPlace = splitPlace1.cross(uniform).filter { _._2.featureIndex == _._1._1 }
+
+    //  val Left = labledSample.cross(splitPlace).filter { _._1.feature(0)< }
+    //.filter { _._2._1 <= 3 }
+    //.filter { _._1.label == 0 }
 
     // emit result
     //    updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
@@ -160,6 +168,7 @@ object WordCount {
     //    entropyRight.writeAsText("/home/hadoop/Desktop/test/entropyRight")
     gain.writeAsText("/home/hadoop/Desktop/test/gain")
     splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
+    //  Left.writeAsText("/home/hadoop/Desktop/test/Left")
 
     //entropy2.writeAsText(outputPath)
 
@@ -184,6 +193,7 @@ object WordCount {
   case class Uniform(featureIndex: Int, uniform: List[Double])
   case class Sum(label: Double, featureIndex: Int, uniform: List[Double])
   case class LabeledVector(label: Double, feature: List[Double])
+  case class SplitedVector(position: List[Int], label: Double, feature: List[Double])
 
   private def parseParameters(args: Array[String]): Boolean = {
     println(" start parse")
