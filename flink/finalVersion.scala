@@ -29,8 +29,58 @@ object WordCount {
     val nonEmptyDatasets: DataSet[Array[String]] = datasets.map { s => s.split("\t") }.filter { !_.contains("") }
     //nonEmptyDatasets.map { s => s.toList }.writeAsText("/home/hadoop/Desktop/test/nonEmptyDatasets")
 
-    val labledSample = inputPro(nonEmptyDatasets)
+    val labledSample: DataSet[LabeledVector] = inputPro(nonEmptyDatasets)
     //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
+
+    val splitedSample = split(labledSample)
+    splitedSample.map { s => (s.position.toList, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
+
+    // execute program
+    env.execute(" Decision Tree ")
+  }
+
+  private var inputPath: String = null
+  private var outputPath: String = null
+  private val numFeature = 2 // number of independent features
+  private val numBins = 5 // B bins for Update procedure
+  private val numSplit = 3 //By default it should be same as numBins
+  private val numLevel = 3 // how many levels of tree
+  private val leastSample = 5 // least number of samples in one node
+
+  case class LabeledVector(position: ArrayBuffer[Char], label: Double, feature: Array[Double])
+  case class Histo(featureValue: Double, frequency: Double)
+  case class Histogram(label: Double, featureIndex: Int, histo: Array[Histo])
+  case class MergedHisto(featureIndex: Int, histo: Array[Histo])
+  case class Uniform(featureIndex: Int, uniform: Array[Double])
+  case class Sum(label: Double, featureIndex: Int, sum: Array[Double])
+
+  // *************************************************************************
+  //  UTIL METHODS
+  // *************************************************************************
+
+  private def parseParameters(args: Array[String]): Boolean = {
+    println(" start parse")
+    if (args.length == 2) {
+
+      inputPath = args(0)
+      outputPath = args(1)
+      println(" stop parse")
+      true
+    } else {
+      System.err.println("Please set input/output path. \n")
+      false
+    }
+  }
+
+  private def getDataSet(env: ExecutionEnvironment): DataSet[String] = {
+    println(" start input")
+    env.readTextFile(inputPath)
+  }
+
+  /*
+   * split the samples
+   */
+  def split(labledSample: DataSet[LabeledVector]): DataSet[LabeledVector] = {
 
     val histoSample: DataSet[Histogram] = labledSample.flatMap { s =>
       (0 until s.feature.size) map {
@@ -77,44 +127,7 @@ object WordCount {
         else
           new LabeledVector(s._1.position += ('R'), s._1.label, s._1.feature)
       }
-    splitedSample.map { s => (s.position.toList, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
-
-    // execute program
-    env.execute(" Decision Tree ")
-  }
-
-  private var inputPath: String = null
-  private var outputPath: String = null
-  private val numFeature = 2 // number of independent features
-  private val numBins = 5 // B bins for Update procedure
-  private val numSplit = 3 //By default it should be same as numBins
-  private val numLevel = 3 // how many levels of tree
-  private val leastSample = 5 // least number of samples in one node
-
-  case class LabeledVector(position: ArrayBuffer[Char], label: Double, feature: Array[Double])
-  case class Histo(featureValue: Double, frequency: Double)
-  case class Histogram(label: Double, featureIndex: Int, histo: Array[Histo])
-  case class MergedHisto(featureIndex: Int, histo: Array[Histo])
-  case class Uniform(featureIndex: Int, uniform: Array[Double])
-  case class Sum(label: Double, featureIndex: Int, sum: Array[Double])
-
-  private def parseParameters(args: Array[String]): Boolean = {
-    println(" start parse")
-    if (args.length == 2) {
-
-      inputPath = args(0)
-      outputPath = args(1)
-      println(" stop parse")
-      true
-    } else {
-      System.err.println("Please set input/output path. \n")
-      false
-    }
-  }
-
-  private def getDataSet(env: ExecutionEnvironment): DataSet[String] = {
-    println(" start input")
-    env.readTextFile(inputPath)
+    splitedSample
   }
 
   /*
