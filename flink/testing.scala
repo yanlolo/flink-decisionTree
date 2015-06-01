@@ -131,22 +131,23 @@ object WordCount {
     val gain: DataSet[(Int, List[Double])] = gainCal(labledSample, sum)
 
     val splitPlace: DataSet[(Int, Double)] = findSplitPlace(gain, uniform)
-    //  val Left = labledSample.cross(splitPlace).filter { _._1.feature(0)< }
-    //.filter { _._2._1 <= 3 }
-    //.filter { _._1.label == 0 }
+
+    val splitedSample = labledSample.cross(splitPlace)
+      .map { s =>
+        if (s._1.feature(s._2._1) < s._2._2)
+          new SplitedVector(List('L'), s._1.label, s._1.feature)
+        else
+          new SplitedVector(List('R'), s._1.label, s._1.feature)
+      }
 
     // emit result
     updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
     mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
     uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
     sum.writeAsText("/home/hadoop/Desktop/test/sum")
-    //    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
-    //    entropyLeft.writeAsText("/home/hadoop/Desktop/test/entropyLeft")
-    //    sumRight.writeAsText("/home/hadoop/Desktop/test/sumRight")
-    //    entropyRight.writeAsText("/home/hadoop/Desktop/test/entropyRight")
     gain.writeAsText("/home/hadoop/Desktop/test/gain")
     splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
-    //  Left.writeAsText("/home/hadoop/Desktop/test/Left")
+    splitedSample.writeAsText("/home/hadoop/Desktop/test/Left")
 
     //entropy2.writeAsText(outputPath)
 
@@ -171,7 +172,7 @@ object WordCount {
   case class Uniform(featureIndex: Int, uniform: List[Double])
   case class Sum(label: Double, featureIndex: Int, uniform: List[Double])
   case class LabeledVector(label: Double, feature: List[Double])
-  case class SplitedVector(position: List[Int], label: Double, feature: List[Double])
+  case class SplitedVector(position: List[Char], label: Double, feature: List[Double])
 
   private def parseParameters(args: Array[String]): Boolean = {
     println(" start parse")
