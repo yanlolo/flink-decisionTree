@@ -128,40 +128,18 @@ object WordCount {
         out.collect(sumPro(uni, updatedSample))
     }
 
-    val gain = gainCal(labledSample, sum)
+    val gain: DataSet[(Int, List[Double])] = gainCal(labledSample, sum)
 
-    val splitPlace1 = gain.map {
-      s =>
-        val feature = s._2
-        var max = Integer.MIN_VALUE.toDouble
-        var maxIndex = 0
-        for (i <- 0 until feature.length) {
-          if (feature(i) > max) {
-            max = feature(i)
-            maxIndex = i
-          }
-        }
-        (s._1, maxIndex)
-    }.reduce { (s1, s2) =>
-      var re = (0, 0)
-      if (s1._2 <= s2._2)
-        re = s2
-      else
-        re = s1
-      re
-    }
-
-    val splitPlace = splitPlace1.cross(uniform).filter { _._2.featureIndex == _._1._1 }
-
+    val splitPlace: DataSet[(Int, Double)] = findSplitPlace(gain, uniform)
     //  val Left = labledSample.cross(splitPlace).filter { _._1.feature(0)< }
     //.filter { _._2._1 <= 3 }
     //.filter { _._1.label == 0 }
 
     // emit result
-    //    updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
-    //    mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
-    //    uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
-    //sum.writeAsText("/home/hadoop/Desktop/test/sum")
+    updatedSample.writeAsText("/home/hadoop/Desktop/test/updatedSample")
+    mergedSample.writeAsText("/home/hadoop/Desktop/test/mergedSample")
+    uniform.writeAsText("/home/hadoop/Desktop/test/uniform")
+    sum.writeAsText("/home/hadoop/Desktop/test/sum")
     //    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
     //    entropyLeft.writeAsText("/home/hadoop/Desktop/test/entropyLeft")
     //    sumRight.writeAsText("/home/hadoop/Desktop/test/sumRight")
@@ -430,7 +408,7 @@ object WordCount {
   }
 
   /*
-   * define gain calculate
+   *  calculate gain for every split candidates
    */
   def gainCal(labledSample: DataSet[LabeledVector], sum: DataSet[Sum]): DataSet[(Int, List[Double])] = {
 
@@ -467,6 +445,39 @@ object WordCount {
         })
     }
     gain
+  }
+
+  /*
+   * find the split place
+   */
+  def findSplitPlace(gain: DataSet[(Int, List[Double])], uniform: DataSet[Uniform]): DataSet[(Int, Double)] = {
+    // (the split feature, the uniform place)
+    val splitPlace1 = gain.map {
+      s =>
+        val feature = s._2
+        var max = Integer.MIN_VALUE.toDouble
+        var maxIndex = 0
+        for (i <- 0 until feature.length) {
+          if (feature(i) > max) {
+            max = feature(i)
+            maxIndex = i
+          }
+        }
+        (s._1, maxIndex)
+    }.reduce { (s1, s2) =>
+      var re = (0, 0)
+      if (s1._2 <= s2._2)
+        re = s2
+      else
+        re = s1
+      re
+    }
+
+    val splitPlace = splitPlace1.cross(uniform).filter { s => (s._2.featureIndex == s._1._1) } // get the matched feature
+      .map {
+        s => (s._1._1, s._2.uniform(s._1._2))
+      }
+    splitPlace
   }
 
 }
