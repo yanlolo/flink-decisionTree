@@ -68,6 +68,9 @@ object WordCount {
     val gain: DataSet[Gain] = gainCal(labledSample, sum)
     gain.map { s => (s.position, s.featureIndex, s.gain.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
 
+    val splitPlace: DataSet[(String, Int, Double)] = findSplitPlace(gain, uniform)
+    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
+
     // execute program
     env.execute(" Decision Tree ")
   }
@@ -430,7 +433,6 @@ object WordCount {
   /*
      *  calculate gain for every split candidates
      */
-
   def gainCal(labledSample: DataSet[LabeledVector], sum: DataSet[Sum]): DataSet[Gain] = {
     val numSampleByLabel: DataSet[Frequency] = labledSample.map { s => new Frequency(s.position, s.label, 1) }
       .groupBy("position", "label").sum("frequency")
@@ -476,9 +478,43 @@ object WordCount {
           case (e, i) => s._6 - s._5(i) * e - (1 - s._5(i)) * s._4(i)
         })
       }
-
     //gain.map { s => (s.position, s.featureIndex, s.gain.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
+
     gain
+  }
+
+  /*
+   * find the split place
+   */
+  def findSplitPlace(gain: DataSet[Gain], uniform: DataSet[Uniform]): DataSet[(String, Int, Double)] = {
+    // (the split feature, the uniform place)
+    val splitPlace1 = gain.map {
+      s =>
+        val feature = s.gain
+        var max = Integer.MIN_VALUE.toDouble
+        var maxIndex = 0
+        for (i <- 0 until feature.length) {
+          if (feature(i) > max) {
+            max = feature(i)
+            maxIndex = i
+          }
+        }
+        (s.position, s.featureIndex, maxIndex)
+    }.groupBy(0).reduce { (s1, s2) =>
+      var re = (s1._1, 0, 0)
+      if (s1._3 <= s2._3)
+        re = (s1._1, s2._2, s2._3)
+      else
+        re = (s1._1, s1._2, s1._3)
+      re
+    }
+
+    val splitPlace = splitPlace1.join(uniform).where(0).equalTo("position")
+      .filter { s => (s._2.featureIndex == s._1._2) } // get the matched feature
+      .map {
+        s => (s._1._1, s._1._2, s._2.uniform(s._1._3))
+      }
+    splitPlace
   }
 
 }
