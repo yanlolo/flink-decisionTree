@@ -27,22 +27,22 @@ object WordCount {
     val input = getDataSet(env)
     val datasets: DataSet[String] = input.flatMap { _.split("\n") } filter { _.nonEmpty }
     val nonEmptyDatasets: DataSet[Array[String]] = datasets.map { s => s.split("\t") }.filter { !_.contains("") }
-    nonEmptyDatasets.map { s => s.toList }.writeAsText("/home/hadoop/Desktop/test/nonEmptyDatasets")
+    //nonEmptyDatasets.map { s => s.toList }.writeAsText("/home/hadoop/Desktop/test/nonEmptyDatasets")
 
     val labledSample: DataSet[LabeledVector] = inputPro(nonEmptyDatasets)
-    labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
+    //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
 
     val histoSample: DataSet[Histogram] = labledSample.flatMap { s =>
       (0 until s.feature.size) map {
         index => new Histogram(s.position, s.label, index, Array(Histo(s.feature(index), 1)))
       }
     }
-    histoSample.map { s => (s.position, s.label, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/histoSample")
+    //histoSample.map { s => (s.position, s.label, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/histoSample")
 
     val updatedSample: DataSet[Histogram] = histoSample.groupBy("position", "label", "featureIndex") reduce {
       (h1, h2) => updatePro(h1, h2)
     }
-    updatedSample.map { s => (s.position, s.label, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/updatedSample")
+    //updatedSample.map { s => (s.position, s.label, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/updatedSample")
 
     val mergedSample: DataSet[MergedHisto] = updatedSample.map { s => new MergedHisto(s.position, s.featureIndex, s.histo) }
       .groupBy("position", "featureIndex") reduce {
@@ -51,8 +51,22 @@ object WordCount {
     mergedSample.map { s => (s.position, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/mergedSample")
 
     val numSample: DataSet[NumSample] = labledSample.map { s => new NumSample(s.position, 1) }
-      .groupBy("position").reduce { (s1, s2) => new NumSample(s1.position, s1.number + s2.number) }
-    numSample.map { s => (s.position, s.number) }.writeAsText("/home/hadoop/Desktop/test/numSample")
+      .reduce { (s1, s2) => new NumSample(s1.position, s1.number + s2.number) }
+    //.groupBy("position")
+    numSample.writeAsText("/home/hadoop/Desktop/test/numSample")
+
+    val uniform: DataSet[Uniform] = numSample.join(mergedSample).where("position").equalTo("position")
+      .map { sample => uniformPro(sample) }
+    uniform.map { s => (s.position, s.featureIndex, s.uniform.toList) } writeAsText ("/home/hadoop/Desktop/test/uniform")
+
+    val sum: DataSet[Sum] = uniform.join(updatedSample).where("position", "featureIndex").equalTo("position", "featureIndex") {
+      (uni, updatedSample, out: Collector[Sum]) =>
+        out.collect(sumPro(uni, updatedSample))
+    }
+    sum.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) }.writeAsText("/home/hadoop/Desktop/test/sum")
+
+    val gain: DataSet[Gain] = gainCal(labledSample, sum)
+    //gain.map { s => (s._1, s._2.toList) }.writeAsText("/home/hadoop/Desktop/test/gain")
 
     // execute program
     env.execute(" Decision Tree ")
@@ -69,11 +83,15 @@ object WordCount {
   private val numLevel = 3 // how many levels of tree
   private val leastSample = 5 // least number of samples in one node
 
-  case class LabeledVector(position: ArrayBuffer[Char], label: Double, feature: Array[Double])
+  case class LabeledVector(position: String, label: Double, feature: Array[Double])
   case class Histo(featureValue: Double, frequency: Double)
-  case class Histogram(position: ArrayBuffer[Char], label: Double, featureIndex: Int, histo: Array[Histo])
-  case class MergedHisto(position: ArrayBuffer[Char], featureIndex: Int, histo: Array[Histo])
-  case class NumSample(position: ArrayBuffer[Char], number: Int)
+  case class Histogram(position: String, label: Double, featureIndex: Int, histo: Array[Histo])
+  case class MergedHisto(position: String, featureIndex: Int, histo: Array[Histo])
+  case class NumSample(position: String, number: Int)
+  case class Uniform(position: String, featureIndex: Int, uniform: Array[Double])
+  case class Sum(position: String, label: Double, featureIndex: Int, sum: Array[Double])
+  case class Gain(position: String, featureIndex: Int, gain: Array[Double])
+  case class Frequency(position: String, label: Double, frequency: Double)
 
   // *************************************************************************
   //  UTIL METHODS
@@ -174,7 +192,7 @@ object WordCount {
     }
 
     val labledSample: DataSet[LabeledVector] = nonEmptySample.map { s =>
-      new LabeledVector(ArrayBuffer('C'), s(0), s.drop(1).take(13))
+      new LabeledVector("", s(0), s.drop(1).take(13))
     }
 
     labledSample
@@ -235,6 +253,216 @@ object WordCount {
       re = new MergedHisto(m1.position, m1.featureIndex, h)
     }
     re
+  }
+
+  /*
+   * uniform process
+   */
+  def uniformPro(sample: (NumSample, MergedHisto)): Uniform = {
+    val histo = sample._2.histo //ascend
+    val len = histo.length
+    var u = new Array[Double](numSplit - 1)
+
+    for (j <- 1 to numSplit - 1) {
+      var s = j * sample._1.number / numSplit.toDouble
+
+      if (s <= histo(0).frequency) {
+        u(j - 1) = histo(0).featureValue
+      } else {
+        val totalSum = (0 until len) map { index => histo(index).frequency } reduce { _ + _ }
+        val extendSum = totalSum - histo(len - 1).frequency / 2
+        if (s >= extendSum) {
+          u(j - 1) = histo(len - 1).featureValue
+        } else {
+          var i = 0
+          var sumP = 0.0
+          //sumPro
+          while (sumP < s) {
+            if (i == 0)
+              sumP += histo(i).frequency / 2
+            else
+              sumP += histo(i).frequency / 2 + histo(i - 1).frequency / 2
+            i += 1
+          }
+          i -= 2
+
+          var d = s - (sumP - histo(i + 1).frequency / 2 - histo(i).frequency / 2)
+          var a = histo(i + 1).frequency - histo(i).frequency
+          var b = 2 * histo(i).frequency
+          var c = -2 * d
+          var z = if (a == 0) -c / b else (-b + sqrt(pow(b, 2) - 4 * a * c)) / (2 * a)
+
+          u(j - 1) = histo(i).featureValue + (histo(i + 1).featureValue - histo(i).featureValue) * z
+        }
+      }
+    }
+    new Uniform(sample._1.position, sample._2.featureIndex, u)
+  }
+
+  /*
+   * sum process
+   */
+  def sumPro(uni: Uniform, updatedSample: Histogram): Sum = {
+
+    val histo = updatedSample.histo
+    val len = histo.length
+    var s = new Array[Double](uni.uniform.length)
+
+    var k = 0
+    for (b <- uni.uniform) {
+      var i = 0
+
+      if (len == 0) {
+        s(k) = 0.0
+      } else if (b <= histo(0).featureValue) {
+        s(k) = 0.0
+      } else if (b >= histo(len - 1).featureValue) {
+        s(k) = (0 until len) map { index => histo(index).frequency } reduce { _ + _ }
+      } else {
+        while (b >= histo(i).featureValue) {
+          i += 1
+        }
+        i -= 1
+
+        val mi = histo(i).frequency
+        val mii = histo(i + 1).frequency
+        val pi = histo(i).featureValue
+        val pii = histo(i + 1).featureValue
+        val mb = mi + (mii - mi) * (b - pi) / (pii - pi)
+        s(k) = (mi + mb) * (b - pi) / (2 * (pii - pi))
+
+        for (j <- 0 to i - 1) {
+          s(k) += histo(j).frequency
+        }
+        s(k) += histo(i).frequency / 2
+
+      }
+      k += 1
+    }
+    new Sum(updatedSample.position, updatedSample.label, updatedSample.featureIndex, s)
+  }
+
+  // *************************************************************************
+  //  GAIN
+  // *************************************************************************
+
+  /*
+   * calculate the left part entropy
+   */
+  def entropyLeftCal(sum: DataSet[Sum]): DataSet[Sum] = {
+
+    //frequency for every "position", "featureIndex", regardless of "label"
+    val entropy: DataSet[Sum] = sum.groupBy("position", "featureIndex") reduce {
+      (h1, h2) => new Sum(h1.position, 0, h1.featureIndex, h1.sum.zipWithIndex.map { case (e, i) => e + h2.sum(i) })
+    }
+
+    // Proportion of every label's frequency for "entropy"
+    val entropy2: DataSet[Sum] = sum.join(entropy).where("position", "featureIndex").equalTo("position", "featureIndex")
+      .map { s =>
+        new Sum(s._1.position, s._1.label, s._1.featureIndex, s._1.sum.zipWithIndex.map {
+          case (e, i) =>
+            var re = 0.0
+            if (s._2.sum(i) == 0) {
+              re = 0.0
+            } else {
+              re = e / s._2.sum(i)
+            }
+            re
+        })
+      }
+
+    // sum up the proportion for every label 
+    val entropy3: DataSet[Sum] = entropy2.groupBy("position", "featureIndex") reduce {
+      (h1, h2) =>
+        new Sum(h1.position, 0, h1.featureIndex, h1.sum.zipWithIndex.map {
+          case (e, i) =>
+            var a = 0.0
+            if (e > 0) {
+              a = -e * log(e)
+            }
+
+            var b = 0.0
+            if (h2.sum(i) > 0) {
+              b = -h2.sum(i) * log(h2.sum(i))
+            }
+            a + b
+        })
+    }
+
+    entropy3
+  }
+
+  /*
+   * calculate the entropy of the dataset 
+   */
+  def entropyCal(numSampleByLabel: DataSet[Frequency]): DataSet[Frequency] = {
+
+    //frequency for every "position" of different "label"
+    val entropy: DataSet[Frequency] = numSampleByLabel.groupBy("position").reduce {
+      (h1, h2) => new Frequency(h1.position, 0, h1.frequency + h2.frequency)
+    }
+
+    // Proportion of every label's frequency 
+    val entropy2: DataSet[Frequency] = numSampleByLabel.join(entropy).where("position").equalTo("position")
+      .map {
+        s => new Frequency(s._1.position, s._1.label, s._1.frequency / s._2.frequency)
+      }
+
+    // sum up 
+    val entropy3: DataSet[Frequency] = entropy2.groupBy("position").reduce {
+      (h1, h2) =>
+        {
+          var a = 0.0
+          if (h1.frequency > 0) {
+            a = -h1.frequency * log(h1.frequency)
+          }
+
+          var b = 0.0
+          if (h2.frequency > 0) {
+            b = -h2.frequency * log(h2.frequency)
+          }
+          new Frequency(h1.position, 0, a + b)
+        }
+    }
+    entropy3
+  }
+
+  /*
+   *  calculate gain for every split candidates
+   */
+  def gainCal(labledSample: DataSet[LabeledVector], sum: DataSet[Sum]): DataSet[Gain] = {
+
+    val numSampleByLabel: DataSet[Frequency] = labledSample.map { s => new Frequency(s.position, s.label, 1) }
+      .groupBy("position", "label").sum("frequency")
+
+    val entropy = entropyCal(numSampleByLabel)
+    val entropyLeft = entropyLeftCal(sum)
+    val sumRight = sum.join(numSampleByLabel).where("position", "label").equalTo("position", "label") {
+      (sum, numSampleByLabel, out: Collector[Sum]) =>
+        out.collect(new Sum(sum.position, sum.label, sum.featureIndex, sum.sum.zipWithIndex.map { case (e, i) => numSampleByLabel.frequency - e }))
+    }
+    val entropyRight = entropyLeftCal(sumRight)
+
+    val delta1: DataSet[Sum] = sum.groupBy("position", "featureIndex") reduce {
+      (h1, h2) => new Sum(h1.position, 0, h1.featureIndex, h1.sum.zipWithIndex.map { case (e, i) => e + h2.sum(i) })
+    }
+
+    val totalSample = labledSample.map { s => (s.position, 1) }.groupBy("position").reduce((s1, s2) => (s1._1, s1._2 + s2._2))
+
+    // testing
+    val delta = delta1.join(totalSample).where("position").equalTo(0).map {
+      s => (s._1.postion, s._1.featureIndex, s._1.sum.zipWithIndex.map { case (e, i) => e / s._2 })
+    }
+
+    val gain = entropyLeft.join(entropyRight).where("position", "label", "featureIndex").equalTo("position", "label", "featureIndex")
+      .map { s => (s._1.position, s._1.featureIndex, s._1.sum, s._2.sum)
+      }.join(delta).where(0).equalTo(0).cross(entropy).map {
+        s =>
+          (s._1._1._1, s._1._1._2.zipWithIndex.map {
+            case (e, i) => s._2._2 - s._1._2._2(i) * e - (1 - s._1._2._2(i)) * s._1._1._3(i)
+          })
+      }
+    gain
   }
 
 }
