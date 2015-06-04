@@ -65,56 +65,57 @@ object WordCount {
     }
     //sum.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) }.writeAsText("/home/hadoop/Desktop/test/sum")
 
-    //    val gain: DataSet[Gain] = gainCal(labledSample, sum)
-    //    //gain.map { s => (s._1, s._2.toList) }.writeAsText("/home/hadoop/Desktop/test/gain")
+    def gainCal(labledSample: DataSet[LabeledVector], sum: DataSet[Sum]): DataSet[Gain] = {
+      val numSampleByLabel: DataSet[Frequency] = labledSample.map { s => new Frequency(s.position, s.label, 1) }
+        .groupBy("position", "label").sum("frequency")
+      numSampleByLabel.writeAsText("/home/hadoop/Desktop/test/numSampleByLabel")
 
-    // testing gain--------------------------------------------------------------------------------------------
-    val numSampleByLabel: DataSet[Frequency] = labledSample.map { s => new Frequency(s.position, s.label, 1) }
-      .groupBy("position", "label").sum("frequency")
-    numSampleByLabel.writeAsText("/home/hadoop/Desktop/test/numSampleByLabel")
+      val entropy: DataSet[Frequency] = entropyCal(numSampleByLabel)
+      entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
 
-    val entropy: DataSet[Frequency] = entropyCal(numSampleByLabel)
-    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
+      val entropyLeft: DataSet[Sum] = entropyLeftCal(sum)
+      entropyLeft.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) } writeAsText ("/home/hadoop/Desktop/test/entropyLeft")
 
-    val entropyLeft: DataSet[Sum] = entropyLeftCal(sum)
-    entropyLeft.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) } writeAsText ("/home/hadoop/Desktop/test/entropyLeft")
-
-    val sumRight: DataSet[Sum] = sum.join(numSampleByLabel).where("position", "label").equalTo("position", "label") {
-      (sum, numSampleByLabel, out: Collector[Sum]) =>
-        out.collect(new Sum(sum.position, sum.label, sum.featureIndex, sum.sum.zipWithIndex.map { case (e, i) => numSampleByLabel.frequency - e }))
-    }
-    val entropyRight: DataSet[Sum] = entropyLeftCal(sumRight)
-    entropyRight.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) } writeAsText ("/home/hadoop/Desktop/test/entropyRight")
-
-    val delta1: DataSet[Sum] = sum.groupBy("position", "featureIndex") reduce {
-      (h1, h2) => new Sum(h1.position, 0, h1.featureIndex, h1.sum.zipWithIndex.map { case (e, i) => e + h2.sum(i) })
-    }
-    delta1.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) } writeAsText ("/home/hadoop/Desktop/test/delta1")
-
-    val totalSample = labledSample.map { s => (s.position, 1) }.reduce((s1, s2) => (s1._1, s1._2 + s2._2))
-    //.groupBy("position")
-    totalSample.map { s => (s._1, s._2) } writeAsText ("/home/hadoop/Desktop/test/totalSample")
-
-    val delta: DataSet[Gain] = delta1.join(totalSample).where("position").equalTo(0)
-      .map {
-        s => new Gain(s._1.position, s._1.featureIndex, s._1.sum.zipWithIndex.map { case (e, i) => e / s._2._2 })
+      val sumRight: DataSet[Sum] = sum.join(numSampleByLabel).where("position", "label").equalTo("position", "label") {
+        (sum, numSampleByLabel, out: Collector[Sum]) =>
+          out.collect(new Sum(sum.position, sum.label, sum.featureIndex, sum.sum.zipWithIndex.map { case (e, i) => numSampleByLabel.frequency - e }))
       }
-    delta.map { s => (s.position, s.featureIndex, s.gain.toList) }.writeAsText("/home/hadoop/Desktop/test/delta")
+      val entropyRight: DataSet[Sum] = entropyLeftCal(sumRight)
+      entropyRight.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) } writeAsText ("/home/hadoop/Desktop/test/entropyRight")
 
-    val gain = entropyLeft.join(entropyRight).where("position", "label", "featureIndex").equalTo("position", "label", "featureIndex")
-      .map { s => (s._1.position, s._1.featureIndex, s._1.sum, s._2.sum) }
-      .join(delta).where(0, 1).equalTo("position", "featureIndex")
-      .map { s => (s._1._1, s._1._2, s._1._3, s._1._4, s._2.gain) }
-      .join(entropy).where(0).equalTo("position")
-      //(1position, 2featureIndex, 3entropyLeft, 4entropyRight, 5delta, 6entropy)
-      .map { s => (s._1._1, s._1._2, s._1._3, s._1._4, s._1._5, s._2.frequency) }
-      .map { s =>
-        (s._1, s._2, s._3.zipWithIndex.map {
-          case (e, i) => s._6 - s._5(i) * e - (1 - s._5(i)) * s._4(i)
-        })
+      val delta1: DataSet[Sum] = sum.groupBy("position", "featureIndex") reduce {
+        (h1, h2) => new Sum(h1.position, 0, h1.featureIndex, h1.sum.zipWithIndex.map { case (e, i) => e + h2.sum(i) })
       }
+      delta1.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) } writeAsText ("/home/hadoop/Desktop/test/delta1")
 
-    gain.map { s => (s._1, s._2, s._3.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
+      val totalSample = labledSample.map { s => (s.position, 1) }.reduce((s1, s2) => (s1._1, s1._2 + s2._2))
+      //.groupBy("position")
+      totalSample.map { s => (s._1, s._2) } writeAsText ("/home/hadoop/Desktop/test/totalSample")
+
+      val delta: DataSet[Gain] = delta1.join(totalSample).where("position").equalTo(0)
+        .map {
+          s => new Gain(s._1.position, s._1.featureIndex, s._1.sum.zipWithIndex.map { case (e, i) => e / s._2._2 })
+        }
+      delta.map { s => (s.position, s.featureIndex, s.gain.toList) }.writeAsText("/home/hadoop/Desktop/test/delta")
+
+      val gain: DataSet[Gain] = entropyLeft.join(entropyRight).where("position", "label", "featureIndex").equalTo("position", "label", "featureIndex")
+        .map { s => (s._1.position, s._1.featureIndex, s._1.sum, s._2.sum) }
+        .join(delta).where(0, 1).equalTo("position", "featureIndex")
+        .map { s => (s._1._1, s._1._2, s._1._3, s._1._4, s._2.gain) }
+        .join(entropy).where(0).equalTo("position")
+        //(1position, 2featureIndex, 3entropyLeft, 4entropyRight, 5delta, 6entropy)
+        .map { s => (s._1._1, s._1._2, s._1._3, s._1._4, s._1._5, s._2.frequency) }
+        .map { s =>
+          new Gain(s._1, s._2, s._3.zipWithIndex.map {
+            case (e, i) => s._6 - s._5(i) * e - (1 - s._5(i)) * s._4(i)
+          })
+        }
+
+      gain.map { s => (s.position, s.featureIndex, s.gain.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
+      gain
+    }
+
+    val gain: DataSet[Gain] = gainCal(labledSample, sum)
 
     // execute program
     env.execute(" Decision Tree ")
@@ -475,42 +476,8 @@ object WordCount {
     entropy3
   }
 
-  //  /*
-  //   *  calculate gain for every split candidates
-  //   */
-  //  def gainCal(labledSample: DataSet[LabeledVector], sum: DataSet[Sum]): DataSet[Gain] = {
-  //
-  //    val numSampleByLabel: DataSet[Frequency] = labledSample.map { s => new Frequency(s.position, s.label, 1) }
-  //      .groupBy("position", "label").sum("frequency")
-  //
-  //    val entropy = entropyCal(numSampleByLabel)
-  //    val entropyLeft = entropyLeftCal(sum)
-  //    val sumRight = sum.join(numSampleByLabel).where("position", "label").equalTo("position", "label") {
-  //      (sum, numSampleByLabel, out: Collector[Sum]) =>
-  //        out.collect(new Sum(sum.position, sum.label, sum.featureIndex, sum.sum.zipWithIndex.map { case (e, i) => numSampleByLabel.frequency - e }))
-  //    }
-  //    val entropyRight = entropyLeftCal(sumRight)
-  //
-  //    val delta1: DataSet[Sum] = sum.groupBy("position", "featureIndex") reduce {
-  //      (h1, h2) => new Sum(h1.position, 0, h1.featureIndex, h1.sum.zipWithIndex.map { case (e, i) => e + h2.sum(i) })
-  //    }
-  //
-  //    val totalSample = labledSample.map { s => (s.position, 1) }.groupBy("position").reduce((s1, s2) => (s1._1, s1._2 + s2._2))
-  //
-  //    // testing
-  //    val delta = delta1.join(totalSample).where("position").equalTo(0).map {
-  //      s => (s._1.postion, s._1.featureIndex, s._1.sum.zipWithIndex.map { case (e, i) => e / s._2 })
-  //    }
-  //
-  //    val gain = entropyLeft.join(entropyRight).where("position", "label", "featureIndex").equalTo("position", "label", "featureIndex")
-  //      .map { s => (s._1.position, s._1.featureIndex, s._1.sum, s._2.sum)
-  //      }.join(delta).where(0).equalTo(0).cross(entropy).map {
-  //        s =>
-  //          (s._1._1._1, s._1._1._2.zipWithIndex.map {
-  //            case (e, i) => s._2._2 - s._1._2._2(i) * e - (1 - s._1._2._2(i)) * s._1._1._3(i)
-  //          })
-  //      }
-  //    gain
-  //  }
+  /*
+     *  calculate gain for every split candidates
+     */
 
 }
