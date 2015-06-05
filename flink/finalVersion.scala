@@ -50,9 +50,8 @@ object WordCount {
       }
     //mergedSample.map { s => (s.position, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/mergedSample")
 
-    val numSample: DataSet[NumSample] = labledSample.map { s => new NumSample(s.position, 1) }
+    val numSample: DataSet[NumSample] = labledSample.map { s => new NumSample(s.position, 1) }.groupBy(0)
       .reduce { (s1, s2) => new NumSample(s1.position, s1.number + s2.number) }
-    //.groupBy("position")
     //numSample.writeAsText("/home/hadoop/Desktop/test/numSample")
 
     val uniform: DataSet[Uniform] = numSample.join(mergedSample).where("position").equalTo("position")
@@ -465,8 +464,7 @@ object WordCount {
     }
     //delta1.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) } writeAsText ("/home/hadoop/Desktop/test/delta1")
 
-    val totalSample = labledSample.map { s => (s.position, 1) }.reduce((s1, s2) => (s1._1, s1._2 + s2._2))
-    //.groupBy("position")
+    val totalSample = labledSample.map { s => (s.position, 1) }.groupBy(0).reduce((s1, s2) => (s1._1, s1._2 + s2._2))
     //totalSample.map { s => (s._1, s._2) } writeAsText ("/home/hadoop/Desktop/test/totalSample")
 
     val delta: DataSet[Gain] = delta1.join(totalSample).where("position").equalTo(0)
