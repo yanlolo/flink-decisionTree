@@ -32,15 +32,17 @@ object WordCount {
     val labledSample: DataSet[LabeledVector] = inputPro(nonEmptyDatasets)
     //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
 
-    val test = partition(labledSample)
-    test._1.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data1")
-    test._2.writeAsText("/home/hadoop/Desktop/test/split1")
+    var result = partition(labledSample)
+    var inputTo: DataSet[LabeledVector] = result._1
+    var split: DataSet[(String, Int, Double)] = result._2
 
-    val test2 = partition(test._1)
-    test2._1.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data2")
-    test2._2.writeAsText("/home/hadoop/Desktop/test/split2")
+    for (i <- 1 to numLevel - 1) {
+      result = partition(inputTo)
+      inputTo = result._1
+      split = split.union(result._2)
+    }
 
-    val split: DataSet[(String, Int, Double)] = test._2.union(test2._2)
+    inputTo.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data")
     split.writeAsText("/home/hadoop/Desktop/test/split")
 
     // execute program
