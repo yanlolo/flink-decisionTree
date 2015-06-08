@@ -31,6 +31,7 @@ object WordCount {
 
     val labledSample: DataSet[LabeledVector] = inputPro(nonEmptyDatasets)
     //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
+    val totalNum = labledSample.map { s => 1 }.reduce { _ + _ }
 
     var result = partition(labledSample)
     var inputTo: DataSet[LabeledVector] = result._1
@@ -45,7 +46,10 @@ object WordCount {
     inputTo.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data")
     split.writeAsText("/home/hadoop/Desktop/test/split")
 
-    // execute program
+    val testErr = testErrCal(inputTo, totalNum)
+    testErr.writeAsText("/home/hadoop/Desktop/test/testErr")
+
+    // execute programreal
     env.execute(" Decision Tree ")
   }
 
@@ -153,8 +157,8 @@ object WordCount {
 
   def inputPro(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVector] = {
     val nonEmptySample: DataSet[Array[Double]] = nonEmptyDatasets.map { s =>
-      var re = new Array[Double](3)
-      //var re = new Array[Double](40)
+      //var re = new Array[Double](3)
+      var re = new Array[Double](40)
       var i = 0
 
       for (aa <- s) {
@@ -543,4 +547,29 @@ object WordCount {
     (splitedSample, splitPlace)
   }
 
+  /*
+     * test error to measure the algorithm accuracy
+     */
+  def testErrCal(inputTo: DataSet[LabeledVector], totalNum: DataSet[Int]): DataSet[Double] = {
+    val real = inputTo.map { s => new Frequency(s.position, s.label, 1) }
+      .groupBy("position", "label").reduce { (s1, s2) => new Frequency(s1.position, s1.label, s1.frequency + s2.frequency) }
+    val prediction = real.groupBy("position").reduce { (s1, s2) =>
+      var re = new Frequency(s1.position, s1.label, 0)
+      if (s1.frequency > s2.frequency)
+        re = new Frequency(s1.position, s1.label, s1.frequency + s2.frequency)
+      else
+        re = new Frequency(s1.position, s2.label, s1.frequency + s2.frequency)
+      re
+    }
+    val testErrs = real.join(prediction).where("position").equalTo("position") {
+      (real, prediction, out: Collector[Double]) =>
+        var count = 0.0
+        if (real.label != prediction.label)
+          count += real.frequency
+        out.collect(count)
+    }.reduce { _ + _ }
+
+    val testErr = testErrs.cross(totalNum).map { s => s._1 / s._2 }
+    testErr
+  }
 }
