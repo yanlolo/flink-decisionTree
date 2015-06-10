@@ -49,7 +49,7 @@ object WordCount {
     val testErr = testErrCal(inputTo, totalNum)
     testErr.writeAsText("/home/hadoop/Desktop/test/testErr")
 
-    // execute programreal
+    // execute program
     env.execute(" Decision Tree ")
   }
 
@@ -100,75 +100,19 @@ object WordCount {
   /*
    * input data process
    */
-  def toDouble1(c: Char): Double = {
-    var re = 0.0
-    if (c == '0')
-      re = 0
-    if (c == '1')
-      re = 1
-    if (c == '2')
-      re = 2
-    if (c == '3')
-      re = 3
-    if (c == '4')
-      re = 4
-    if (c == '5')
-      re = 5
-    if (c == '6')
-      re = 6
-    if (c == '7')
-      re = 7
-    if (c == '8')
-      re = 8
-    if (c == '9')
-      re = 9
-    if (c == 'a')
-      re = 10
-    if (c == 'b')
-      re = 11
-    if (c == 'c')
-      re = 12
-    if (c == 'd')
-      re = 13
-    if (c == 'e')
-      re = 14
-    if (c == 'f')
-      re = 15
-
-    re
-  }
-
-  //Hex
-  //    def toDouble2(s: String): Double = { 
-  //      var re = 0.0
-  //      for (ss <- s) {
-  //        re = re * 16 + toDouble1(ss)
-  //      }
-  //      re
-  //    }
-
-  def toDouble2(s: String): Double = {
-    var re = 0.0
-    for (ss <- s) {
-      re += toDouble1(ss)
-    }
-    re
-  }
-
   def inputPro(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVector] = {
-    val nonEmptySample: DataSet[Array[Double]] = nonEmptyDatasets.map { s =>
+
+    val nonEmptySample: DataSet[Array[Double]] = nonEmptyDatasets.map { s => s.take(14)
+    }.map { s =>
       //var re = new Array[Double](3)
-      var re = new Array[Double](40)
+      var re = new Array[Double](14)
       var i = 0
 
       for (aa <- s) {
         if (i <= 13)
           re(i) = aa.toDouble
-        else
-          re(i) = toDouble2(aa)
         i += 1
       }
-
       re
     }
 
