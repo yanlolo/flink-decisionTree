@@ -30,16 +30,83 @@ object WordCount {
     //nonEmptyDatasets.map { s => s.toList }.writeAsText("/home/hadoop/Desktop/test/nonEmptyDatasets")
 
     val labledSample: DataSet[LabeledVectorStr] = inputProCat(nonEmptyDatasets)
+    val splitedSample: DataSet[LabeledVectorStr] = partitionCate(labledSample)
 
+    splitedSample.map { s => (s.position, s.label, s.feature.toList) } writeAsText ("/home/hadoop/Desktop/test/splitedSample")
+
+    // execute program
+    env.execute(" Decision Tree ")
+  }
+
+  // *************************************************************************
+  //  UTIL Variable
+  // *************************************************************************  
+  private var inputPath: String = null
+  private var outputPath: String = null
+  private val numFeature = 2 // number of independent features
+  private val numBins = 5 // B bins for Update procedure
+  private val numSplit = 3 //By default it should be same as numBins
+  private val numLevel = 3 // how many levels of tree
+  private val leastSample = 5 // least number of samples in one node
+
+  case class LabeledVector(position: String, label: Double, feature: Array[Double])
+  case class Histo(featureValue: Double, frequency: Double)
+  case class Histogram(position: String, label: Double, featureIndex: Int, histo: Array[Histo])
+  case class MergedHisto(position: String, featureIndex: Int, histo: Array[Histo])
+  case class NumSample(position: String, number: Int)
+  case class Uniform(position: String, featureIndex: Int, uniform: Array[Double])
+  case class Sum(position: String, label: Double, featureIndex: Int, sum: Array[Double])
+  case class Gain(position: String, featureIndex: Int, gain: Array[Double])
+  case class Frequency(position: String, label: Double, frequency: Double)
+
+  case class LabeledVectorStr(position: String, label: Double, feature: Array[String])
+  case class HistogramStr(position: String, label: Double, featureIndex: Int, featureValue: String, frequency: Double)
+  case class GainStr(position: String, featureIndex: Int, featureValue: String, gain: Double)
+
+  // *************************************************************************
+  //  UTIL METHODS
+  // *************************************************************************
+
+  private def parseParameters(args: Array[String]): Boolean = {
+    println(" start parse")
+    if (args.length == 2) {
+
+      inputPath = args(0)
+      outputPath = args(1)
+      println(" stop parse")
+      true
+    } else {
+      System.err.println("Please set input/output path. \n")
+      false
+    }
+  }
+
+  private def getDataSet(env: ExecutionEnvironment): DataSet[String] = {
+    println(" start input")
+    env.readTextFile(inputPath)
+  }
+
+  /*
+   * input data process
+   */
+
+  def inputProCat(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVectorStr] = {
+
+    val labledSample: DataSet[LabeledVectorStr] = nonEmptyDatasets.map { s =>
+      //new LabeledVectorStr("", s(0).toDouble, s.drop(14).take(26))
+      new LabeledVectorStr("", s(0).toDouble, s.drop(1).take(2))
+    }
+
+    labledSample
+  }
+
+  def partitionCate(labledSample: DataSet[LabeledVectorStr]): DataSet[LabeledVectorStr] = {
     val histoSample: DataSet[HistogramStr] = labledSample.flatMap { s =>
       (0 until s.feature.size) map {
         index => new HistogramStr(s.position, s.label, index, s.feature(index), 1)
       }
     }
 
-    /*
- * testing
- */
     //gain
     val gainPre1 = labledSample.map { s => new Frequency(s.position, s.label, 1) }.groupBy("position", "label").reduce {
       (s1, s2) => new Frequency(s1.position, s1.label, s1.frequency + s2.frequency)
@@ -171,71 +238,8 @@ object WordCount {
         else
           new LabeledVectorStr(s._1.position ++ "R", s._1.label, s._1.feature)
       }
-    splitedSample.map { s => (s.position, s.label, s.feature.toList) } writeAsText ("/home/hadoop/Desktop/test/splitedSample")
 
-    // execute program
-    env.execute(" Decision Tree ")
-  }
-
-  // *************************************************************************
-  //  UTIL Variable
-  // *************************************************************************  
-  private var inputPath: String = null
-  private var outputPath: String = null
-  private val numFeature = 2 // number of independent features
-  private val numBins = 5 // B bins for Update procedure
-  private val numSplit = 3 //By default it should be same as numBins
-  private val numLevel = 3 // how many levels of tree
-  private val leastSample = 5 // least number of samples in one node
-
-  case class LabeledVector(position: String, label: Double, feature: Array[Double])
-  case class Histo(featureValue: Double, frequency: Double)
-  case class Histogram(position: String, label: Double, featureIndex: Int, histo: Array[Histo])
-  case class MergedHisto(position: String, featureIndex: Int, histo: Array[Histo])
-  case class NumSample(position: String, number: Int)
-  case class Uniform(position: String, featureIndex: Int, uniform: Array[Double])
-  case class Sum(position: String, label: Double, featureIndex: Int, sum: Array[Double])
-  case class Gain(position: String, featureIndex: Int, gain: Array[Double])
-  case class Frequency(position: String, label: Double, frequency: Double)
-
-  case class LabeledVectorStr(position: String, label: Double, feature: Array[String])
-  case class HistogramStr(position: String, label: Double, featureIndex: Int, featureValue: String, frequency: Double)
-  case class GainStr(position: String, featureIndex: Int, featureValue: String, gain: Double)
-
-  // *************************************************************************
-  //  UTIL METHODS
-  // *************************************************************************
-
-  private def parseParameters(args: Array[String]): Boolean = {
-    println(" start parse")
-    if (args.length == 2) {
-
-      inputPath = args(0)
-      outputPath = args(1)
-      println(" stop parse")
-      true
-    } else {
-      System.err.println("Please set input/output path. \n")
-      false
-    }
-  }
-
-  private def getDataSet(env: ExecutionEnvironment): DataSet[String] = {
-    println(" start input")
-    env.readTextFile(inputPath)
-  }
-
-  /*
-   * input data process
-   */
-
-  def inputProCat(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVectorStr] = {
-
-    val labledSample: DataSet[LabeledVectorStr] = nonEmptyDatasets.map { s =>
-      new LabeledVectorStr("", s(0).toDouble, s.drop(14).take(26))
-    }
-
-    labledSample
+    splitedSample
   }
 
 }
