@@ -111,13 +111,13 @@ object WordCount {
     val gainPre1 = labledSample.map { s => new Frequency(s.position, s.label, 1) }.groupBy("position", "label").reduce {
       (s1, s2) => new Frequency(s1.position, s1.label, s1.frequency + s2.frequency)
     }
-    gainPre1.writeAsText("/home/hadoop/Desktop/test/gainPre1")
+    //gainPre1.writeAsText("/home/hadoop/Desktop/test/gainPre1")
 
     val gainPre2 = gainPre1.groupBy("position").reduce {
       (s1, s2) =>
         new Frequency(s1.position, 0, s1.frequency + s2.frequency)
     }
-    gainPre2.writeAsText("/home/hadoop/Desktop/test/gainPre2")
+    //gainPre2.writeAsText("/home/hadoop/Desktop/test/gainPre2")
 
     val entropy = gainPre1.join(gainPre2).where("position").equalTo("position") {
       (gainPre1, gainPre2, out: Collector[Frequency]) =>
@@ -131,13 +131,13 @@ object WordCount {
           re
         }
     }
-    entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
+    //entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
 
     val gain = entropy.groupBy("position").reduce {
       (s1, s2) =>
         new Frequency(s1.position, 0, s1.frequency + s2.frequency)
     }
-    gain.writeAsText("/home/hadoop/Desktop/test/gain")
+    //gain.writeAsText("/home/hadoop/Desktop/test/gain")
 
     // gain left
     val gainLeftPre1: DataSet[HistogramStr] = histoSample.groupBy("position", "label", "featureIndex", "featureValue").reduce {
@@ -166,7 +166,7 @@ object WordCount {
         new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
     }
 
-    gainLeft.writeAsText("/home/hadoop/Desktop/test/gainLeft")
+    //gainLeft.writeAsText("/home/hadoop/Desktop/test/gainLeft")
 
     // gain right
     val gainRightPre1 = gainPre1.join(gainLeftPre1).where("position", "label").equalTo("position", "label") {
@@ -195,7 +195,7 @@ object WordCount {
         new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
     }
 
-    gainRight.writeAsText("/home/hadoop/Desktop/test/gainRight")
+    //gainRight.writeAsText("/home/hadoop/Desktop/test/gainRight")
 
     //delta
     val deltaPre1 = histoSample.groupBy("position", "featureIndex", "featureValue").reduce {
@@ -208,7 +208,7 @@ object WordCount {
       s => new HistogramStr(s._1.position, 0, s._1.featureIndex, s._1.featureValue, s._1.frequency / s._2)
     }
 
-    delta.writeAsText("/home/hadoop/Desktop/test/delta")
+    //delta.writeAsText("/home/hadoop/Desktop/test/delta")
 
     val gainInfo = gain.join(gainLeft).where("position").equalTo("position")
       .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1.frequency, s._2.frequency) }
@@ -219,7 +219,7 @@ object WordCount {
       .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1._4, s._1._5, s._1._6, s._2.frequency) }
       .map { s => new GainStr(s._1, s._2, s._3, s._4 - s._7 * s._5 - (1 - s._7) * s._6) }
 
-    gainInfo.writeAsText("/home/hadoop/Desktop/test/gainInfo")
+    //gainInfo.writeAsText("/home/hadoop/Desktop/test/gainInfo")
 
     val splitPlace = gainInfo.groupBy("position").reduce {
       (s1, s2) =>
