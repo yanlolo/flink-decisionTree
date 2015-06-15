@@ -131,158 +131,6 @@ object WordCount {
     labledSample
   }
 
-  def inputProCate(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVectorStr] = {
-
-    val labledSample: DataSet[LabeledVectorStr] = nonEmptyDatasets.map { s =>
-      new LabeledVectorStr("", s(0).toDouble, s.drop(14).take(26))
-      //new LabeledVectorStr("", s(0).toDouble, s.drop(1).take(2))
-    }
-
-    labledSample
-  }
-
-  def partitionCate(labledSample: DataSet[LabeledVectorStr]): DataSet[LabeledVectorStr] = {
-    val histoSample: DataSet[HistogramStr] = labledSample.flatMap { s =>
-      (0 until s.feature.size) map {
-        index => new HistogramStr(s.position, s.label, index, s.feature(index), 1)
-      }
-    }
-
-    //gain
-    val gainPre1 = labledSample.map { s => new Frequency(s.position, s.label, 1) }.groupBy("position", "label").reduce {
-      (s1, s2) => new Frequency(s1.position, s1.label, s1.frequency + s2.frequency)
-    }
-    //gainPre1.writeAsText("/home/hadoop/Desktop/test/gainPre1")
-
-    val gainPre2 = gainPre1.groupBy("position").reduce {
-      (s1, s2) =>
-        new Frequency(s1.position, 0, s1.frequency + s2.frequency)
-    }
-    //gainPre2.writeAsText("/home/hadoop/Desktop/test/gainPre2")
-
-    val entropy = gainPre1.join(gainPre2).where("position").equalTo("position") {
-      (gainPre1, gainPre2, out: Collector[Frequency]) =>
-        out.collect(new Frequency(gainPre1.position, gainPre1.label, gainPre1.frequency / gainPre2.frequency))
-    }.map {
-      s =>
-        {
-          var re = new Frequency(s.position, s.label, 0)
-          if (s.frequency > 0)
-            re = new Frequency(s.position, s.label, -s.frequency * log(s.frequency))
-          re
-        }
-    }
-    //entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
-
-    val gain = entropy.groupBy("position").reduce {
-      (s1, s2) =>
-        new Frequency(s1.position, 0, s1.frequency + s2.frequency)
-    }
-    //gain.writeAsText("/home/hadoop/Desktop/test/gain")
-
-    // gain left
-    val gainLeftPre1: DataSet[HistogramStr] = histoSample.groupBy("position", "label", "featureIndex", "featureValue").reduce {
-      (s1, s2) => new HistogramStr(s1.position, s1.label, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
-    }
-
-    val gainLeftPre2: DataSet[HistogramStr] = gainLeftPre1.groupBy("position", "featureIndex", "featureValue").reduce {
-      (s1, s2) => new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
-    }
-
-    val entropyLeft = gainLeftPre1.join(gainLeftPre2).where("position", "featureIndex", "featureValue").equalTo("position", "featureIndex", "featureValue") {
-      (g1, g2, out: Collector[HistogramStr]) =>
-        out.collect(new HistogramStr(g1.position, g1.label, g1.featureIndex, g1.featureValue, g1.frequency / g2.frequency))
-    }.map {
-      s =>
-        {
-          var re = new HistogramStr(s.position, s.label, s.featureIndex, s.featureValue, 0)
-          if (s.frequency > 0)
-            re = new HistogramStr(s.position, s.label, s.featureIndex, s.featureValue, -s.frequency * log(s.frequency))
-          re
-        }
-    }
-
-    val gainLeft = entropyLeft.groupBy("position", "featureIndex", "featureValue").reduce {
-      (s1, s2) =>
-        new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
-    }
-
-    //gainLeft.writeAsText("/home/hadoop/Desktop/test/gainLeft")
-
-    // gain right
-    val gainRightPre1 = gainPre1.join(gainLeftPre1).where("position", "label").equalTo("position", "label") {
-      (g1, g2, out: Collector[HistogramStr]) =>
-        out.collect(new HistogramStr(g2.position, g2.label, g2.featureIndex, g2.featureValue, g1.frequency - g2.frequency))
-    }
-    val gainRightPre2 = gainRightPre1.groupBy("position", "featureIndex", "featureValue").reduce {
-      (s1, s2) => new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
-    }
-
-    val entropyRight = gainRightPre1.join(gainRightPre2).where("position", "featureIndex", "featureValue").equalTo("position", "featureIndex", "featureValue") {
-      (g1, g2, out: Collector[HistogramStr]) =>
-        out.collect(new HistogramStr(g1.position, g1.label, g1.featureIndex, g1.featureValue, g1.frequency / g2.frequency))
-    }.map {
-      s =>
-        {
-          var re = new HistogramStr(s.position, s.label, s.featureIndex, s.featureValue, 0)
-          if (s.frequency > 0)
-            re = new HistogramStr(s.position, s.label, s.featureIndex, s.featureValue, -s.frequency * log(s.frequency))
-          re
-        }
-    }
-
-    val gainRight = entropyRight.groupBy("position", "featureIndex", "featureValue").reduce {
-      (s1, s2) =>
-        new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
-    }
-
-    //gainRight.writeAsText("/home/hadoop/Desktop/test/gainRight")
-
-    //delta
-    val deltaPre1 = histoSample.groupBy("position", "featureIndex", "featureValue").reduce {
-      (s1, s2) => new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
-    }
-
-    val deltaPre2 = labledSample.map { s => 1 }.reduce { _ + _ }
-
-    val delta = deltaPre1.cross(deltaPre2).map {
-      s => new HistogramStr(s._1.position, 0, s._1.featureIndex, s._1.featureValue, s._1.frequency / s._2)
-    }
-
-    //delta.writeAsText("/home/hadoop/Desktop/test/delta")
-
-    val gainInfo = gain.join(gainLeft).where("position").equalTo("position")
-      .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1.frequency, s._2.frequency) }
-      .join(gainRight).where(0, 1, 2).equalTo("position", "featureIndex", "featureValue")
-      .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1._4, s._1._5, s._2.frequency) }
-      .join(delta).where(0, 1, 2).equalTo("position", "featureIndex", "featureValue")
-      //(1position, 2featureIndex, 3featureValue, 4entropy, 5entropyLeft, 6entropyRight, 7delta )
-      .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1._4, s._1._5, s._1._6, s._2.frequency) }
-      .map { s => new GainStr(s._1, s._2, s._3, s._4 - s._7 * s._5 - (1 - s._7) * s._6) }
-
-    //gainInfo.writeAsText("/home/hadoop/Desktop/test/gainInfo")
-
-    val splitPlace = gainInfo.groupBy("position").reduce {
-      (s1, s2) =>
-        if (s1.gain > s2.gain)
-          s1
-        else
-          s2
-    }
-
-    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitCatePlace")
-
-    val splitedSample: DataSet[LabeledVectorStr] = labledSample.join(splitPlace).where("position").equalTo("position")
-      .map { s =>
-        if (s._1.feature(s._2.featureIndex) == s._2.featureValue)
-          new LabeledVectorStr(s._1.position ++ "L", s._1.label, s._1.feature)
-        else
-          new LabeledVectorStr(s._1.position ++ "R", s._1.label, s._1.feature)
-      }
-
-    splitedSample
-  }
-
   /*
    * update process
    */
@@ -649,6 +497,161 @@ object WordCount {
       }
     //splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
     (splitedSample, splitPlace)
+  }
+
+  /*
+   * 
+   */
+  def inputProCate(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVectorStr] = {
+
+    val labledSample: DataSet[LabeledVectorStr] = nonEmptyDatasets.map { s =>
+      new LabeledVectorStr("", s(0).toDouble, s.drop(14).take(26))
+      //new LabeledVectorStr("", s(0).toDouble, s.drop(1).take(2))
+    }
+
+    labledSample
+  }
+
+  def partitionCate(labledSample: DataSet[LabeledVectorStr]): DataSet[LabeledVectorStr] = {
+    val histoSample: DataSet[HistogramStr] = labledSample.flatMap { s =>
+      (0 until s.feature.size) map {
+        index => new HistogramStr(s.position, s.label, index, s.feature(index), 1)
+      }
+    }
+
+    //gain
+    val gainPre1 = labledSample.map { s => new Frequency(s.position, s.label, 1) }.groupBy("position", "label").reduce {
+      (s1, s2) => new Frequency(s1.position, s1.label, s1.frequency + s2.frequency)
+    }
+    //gainPre1.writeAsText("/home/hadoop/Desktop/test/gainPre1")
+
+    val gainPre2 = gainPre1.groupBy("position").reduce {
+      (s1, s2) =>
+        new Frequency(s1.position, 0, s1.frequency + s2.frequency)
+    }
+    //gainPre2.writeAsText("/home/hadoop/Desktop/test/gainPre2")
+
+    val entropy = gainPre1.join(gainPre2).where("position").equalTo("position") {
+      (gainPre1, gainPre2, out: Collector[Frequency]) =>
+        out.collect(new Frequency(gainPre1.position, gainPre1.label, gainPre1.frequency / gainPre2.frequency))
+    }.map {
+      s =>
+        {
+          var re = new Frequency(s.position, s.label, 0)
+          if (s.frequency > 0)
+            re = new Frequency(s.position, s.label, -s.frequency * log(s.frequency))
+          re
+        }
+    }
+    //entropy.writeAsText("/home/hadoop/Desktop/test/entropy")
+
+    val gain = entropy.groupBy("position").reduce {
+      (s1, s2) =>
+        new Frequency(s1.position, 0, s1.frequency + s2.frequency)
+    }
+    //gain.writeAsText("/home/hadoop/Desktop/test/gain")
+
+    // gain left
+    val gainLeftPre1: DataSet[HistogramStr] = histoSample.groupBy("position", "label", "featureIndex", "featureValue").reduce {
+      (s1, s2) => new HistogramStr(s1.position, s1.label, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
+    }
+
+    val gainLeftPre2: DataSet[HistogramStr] = gainLeftPre1.groupBy("position", "featureIndex", "featureValue").reduce {
+      (s1, s2) => new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
+    }
+
+    val entropyLeft = gainLeftPre1.join(gainLeftPre2).where("position", "featureIndex", "featureValue").equalTo("position", "featureIndex", "featureValue") {
+      (g1, g2, out: Collector[HistogramStr]) =>
+        out.collect(new HistogramStr(g1.position, g1.label, g1.featureIndex, g1.featureValue, g1.frequency / g2.frequency))
+    }.map {
+      s =>
+        {
+          var re = new HistogramStr(s.position, s.label, s.featureIndex, s.featureValue, 0)
+          if (s.frequency > 0)
+            re = new HistogramStr(s.position, s.label, s.featureIndex, s.featureValue, -s.frequency * log(s.frequency))
+          re
+        }
+    }
+
+    val gainLeft = entropyLeft.groupBy("position", "featureIndex", "featureValue").reduce {
+      (s1, s2) =>
+        new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
+    }
+
+    //gainLeft.writeAsText("/home/hadoop/Desktop/test/gainLeft")
+
+    // gain right
+    val gainRightPre1 = gainPre1.join(gainLeftPre1).where("position", "label").equalTo("position", "label") {
+      (g1, g2, out: Collector[HistogramStr]) =>
+        out.collect(new HistogramStr(g2.position, g2.label, g2.featureIndex, g2.featureValue, g1.frequency - g2.frequency))
+    }
+    val gainRightPre2 = gainRightPre1.groupBy("position", "featureIndex", "featureValue").reduce {
+      (s1, s2) => new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
+    }
+
+    val entropyRight = gainRightPre1.join(gainRightPre2).where("position", "featureIndex", "featureValue").equalTo("position", "featureIndex", "featureValue") {
+      (g1, g2, out: Collector[HistogramStr]) =>
+        out.collect(new HistogramStr(g1.position, g1.label, g1.featureIndex, g1.featureValue, g1.frequency / g2.frequency))
+    }.map {
+      s =>
+        {
+          var re = new HistogramStr(s.position, s.label, s.featureIndex, s.featureValue, 0)
+          if (s.frequency > 0)
+            re = new HistogramStr(s.position, s.label, s.featureIndex, s.featureValue, -s.frequency * log(s.frequency))
+          re
+        }
+    }
+
+    val gainRight = entropyRight.groupBy("position", "featureIndex", "featureValue").reduce {
+      (s1, s2) =>
+        new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
+    }
+
+    //gainRight.writeAsText("/home/hadoop/Desktop/test/gainRight")
+
+    //delta
+    val deltaPre1 = histoSample.groupBy("position", "featureIndex", "featureValue").reduce {
+      (s1, s2) => new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
+    }
+
+    val deltaPre2 = labledSample.map { s => 1 }.reduce { _ + _ }
+
+    val delta = deltaPre1.cross(deltaPre2).map {
+      s => new HistogramStr(s._1.position, 0, s._1.featureIndex, s._1.featureValue, s._1.frequency / s._2)
+    }
+
+    //delta.writeAsText("/home/hadoop/Desktop/test/delta")
+
+    val gainInfo = gain.join(gainLeft).where("position").equalTo("position")
+      .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1.frequency, s._2.frequency) }
+      .join(gainRight).where(0, 1, 2).equalTo("position", "featureIndex", "featureValue")
+      .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1._4, s._1._5, s._2.frequency) }
+      .join(delta).where(0, 1, 2).equalTo("position", "featureIndex", "featureValue")
+      //(1position, 2featureIndex, 3featureValue, 4entropy, 5entropyLeft, 6entropyRight, 7delta )
+      .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1._4, s._1._5, s._1._6, s._2.frequency) }
+      .map { s => new GainStr(s._1, s._2, s._3, s._4 - s._7 * s._5 - (1 - s._7) * s._6) }
+
+    //gainInfo.writeAsText("/home/hadoop/Desktop/test/gainInfo")
+
+    val splitPlace = gainInfo.groupBy("position").reduce {
+      (s1, s2) =>
+        if (s1.gain > s2.gain)
+          s1
+        else
+          s2
+    }
+
+    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitCatePlace")
+
+    val splitedSample: DataSet[LabeledVectorStr] = labledSample.join(splitPlace).where("position").equalTo("position")
+      .map { s =>
+        if (s._1.feature(s._2.featureIndex) == s._2.featureValue)
+          new LabeledVectorStr(s._1.position ++ "L", s._1.label, s._1.feature)
+        else
+          new LabeledVectorStr(s._1.position ++ "R", s._1.label, s._1.feature)
+      }
+
+    splitedSample
   }
 
   /*
