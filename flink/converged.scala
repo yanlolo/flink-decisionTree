@@ -44,32 +44,34 @@ object WordCount {
 
     val splitPlace = splitOrder.join(splitedUnorderSample).where(0).equalTo("position").map {
       s =>
-        var re = (0, " ")
+        var re = (s._1._1, 0, " ")
         if (s._1._4 > s._2.gain)
-          re = (s._1._2, s._1._3.toString())
+          re = (s._1._1, s._1._2, s._1._3.toString())
         else
-          re = (s._2.featureIndex + 13, s._2.featureValue)
+          re = (s._1._1, s._2.featureIndex + 13, s._2.featureValue)
         re
     }
     splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
 
-//    val splitedSample: DataSet[Array[String]] = inputSample.join(splitPlace).where(0).equalTo(0)
-//      .map {
-//        s =>
-//          var re = new Array[String](41)
-//          if (s._2._1 <= 12) {
-//            if (s._1(s._2._1 + 2).toDouble < s._2._2.toDouble)
-//              re = Array(s._1(0) ++ "L") ++ s._1.tail
-//            else
-//              re = (s._1(0) ++ "R") +: s._1.tail
-//          } else {
-//            if (s._1(s._2._1 + 2) == s._2._2)
-//              re = (s._1(0) ++ "L") +: s._1.tail
-//            else
-//              re = (s._1(0) ++ "R") +: s._1.tail
-//          }
-//      }
-//    splitedSample.writeAsText("/home/hadoop/Desktop/test/splitedSample")
+    val splitedSample: DataSet[Array[String]] = inputSample.map { s => (s(0), s.tail) }
+      .join(splitPlace).where(0).equalTo(0)
+      .map {
+        s =>
+          var re = new Array[String](41)
+          if (s._2._2 <= 12) {
+            if (s._1._2(s._2._2 + 1).toDouble < s._2._3.toDouble)
+              re = Array(s._1._1 ++ "L") ++ s._1._2
+            else
+              re = Array(s._1._1 ++ "R") ++ s._1._2
+          } else {
+            if (s._1._2(s._2._2 + 1) == s._2._3)
+              re = Array(s._1._1 ++ "L") ++ s._1._2
+            else
+              re = Array(s._1._1 ++ "R") ++ s._1._2
+          }
+          re
+      }
+    splitedSample.map { s => s.toList } writeAsText ("/home/hadoop/Desktop/test/splitedSample")
 
     // execute program
     env.execute(" Decision Tree ")
