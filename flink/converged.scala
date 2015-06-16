@@ -31,47 +31,50 @@ object WordCount {
 
     var inputSample: DataSet[Array[String]] = nonEmptyDatasets.map { s => ("" +: s) }
 
-    val labledOrderSample: DataSet[LabeledVector] = inputProOrder(inputSample)
-    //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
-    val totalNum = labledOrderSample.map { s => 1 }.reduce { _ + _ }
+    for (i <- 1 to numSplit) {
+      var labledOrderSample: DataSet[LabeledVector] = inputProOrder(inputSample)
+      //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
+      var totalNum = labledOrderSample.map { s => 1 }.reduce { _ + _ }
 
-    val splitOrder: DataSet[(String, Int, Double, Double)] = partitionOrder(labledOrderSample)
-    splitOrder.writeAsText("/home/hadoop/Desktop/test/splitOrder")
+      var splitOrder: DataSet[(String, Int, Double, Double)] = partitionOrder(labledOrderSample)
+      //splitOrder.writeAsText("/home/hadoop/Desktop/test/splitOrder")
 
-    val labledUnorderSample: DataSet[LabeledVectorStr] = inputProUnorder(inputSample)
-    val splitedUnorderSample: DataSet[GainStr] = partitionUnorder(labledUnorderSample)
-    splitedUnorderSample.writeAsText("/home/hadoop/Desktop/test/splitedUnorderSample")
+      var labledUnorderSample: DataSet[LabeledVectorStr] = inputProUnorder(inputSample)
+      var splitedUnorderSample: DataSet[GainStr] = partitionUnorder(labledUnorderSample)
+      //splitedUnorderSample.writeAsText("/home/hadoop/Desktop/test/splitedUnorderSample")
 
-    val splitPlace = splitOrder.join(splitedUnorderSample).where(0).equalTo("position").map {
-      s =>
-        var re = (s._1._1, 0, " ")
-        if (s._1._4 > s._2.gain)
-          re = (s._1._1, s._1._2, s._1._3.toString())
-        else
-          re = (s._1._1, s._2.featureIndex + 13, s._2.featureValue)
-        re
-    }
-    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
-
-    val splitedSample: DataSet[Array[String]] = inputSample.map { s => (s(0), s.tail) }
-      .join(splitPlace).where(0).equalTo(0)
-      .map {
+      var splitPlace = splitOrder.join(splitedUnorderSample).where(0).equalTo("position").map {
         s =>
-          var re = new Array[String](41)
-          if (s._2._2 <= 12) {
-            if (s._1._2(s._2._2 + 1).toDouble < s._2._3.toDouble)
-              re = Array(s._1._1 ++ "L") ++ s._1._2
-            else
-              re = Array(s._1._1 ++ "R") ++ s._1._2
-          } else {
-            if (s._1._2(s._2._2 + 1) == s._2._3)
-              re = Array(s._1._1 ++ "L") ++ s._1._2
-            else
-              re = Array(s._1._1 ++ "R") ++ s._1._2
-          }
+          var re = (s._1._1, 0, " ")
+          if (s._1._4 > s._2.gain)
+            re = (s._1._1, s._1._2, s._1._3.toString())
+          else
+            re = (s._1._1, s._2.featureIndex + 13, s._2.featureValue)
           re
       }
-    splitedSample.map { s => s.toList } writeAsText ("/home/hadoop/Desktop/test/splitedSample")
+      //splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
+
+      inputSample = inputSample.map { s => (s(0), s.tail) }
+        .join(splitPlace).where(0).equalTo(0)
+        .map {
+          s =>
+            var re = new Array[String](41)
+            if (s._2._2 <= 12) {
+              if (s._1._2(s._2._2 + 1).toDouble < s._2._3.toDouble)
+                re = Array(s._1._1 ++ "L") ++ s._1._2
+              else
+                re = Array(s._1._1 ++ "R") ++ s._1._2
+            } else {
+              if (s._1._2(s._2._2 + 1) == s._2._3)
+                re = Array(s._1._1 ++ "L") ++ s._1._2
+              else
+                re = Array(s._1._1 ++ "R") ++ s._1._2
+            }
+            re
+        }
+    }
+
+    inputSample.map { s => s.toList } writeAsText ("/home/hadoop/Desktop/test/inputSample")
 
     // execute program
     env.execute(" Decision Tree ")
@@ -416,7 +419,7 @@ object WordCount {
           case (e, i) => s._6 - s._5(i) * e - (1 - s._5(i)) * s._4(i)
         })
       }
-    gain.map { s => (s.position, s.featureIndex, s.gain.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
+    //gain.map { s => (s.position, s.featureIndex, s.gain.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
 
     gain
   }
