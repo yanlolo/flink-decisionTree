@@ -28,13 +28,13 @@ object WordCount {
     val datasets: DataSet[String] = input.flatMap { _.split("\n") } filter { _.nonEmpty }
     val nonEmptyDatasets: DataSet[Array[String]] = datasets.map { s => s.split("\t") }.filter { !_.contains("") }
     //nonEmptyDatasets.map { s => s.toList }.writeAsText("/home/hadoop/Desktop/test/nonEmptyDatasets")
+    var totalNum = nonEmptyDatasets.map { s => 1 }.reduce { _ + _ }
 
     var inputSample: DataSet[Array[String]] = nonEmptyDatasets.map { s => ("" +: s) }
 
     for (i <- 1 to numSplit) {
       var labledOrderSample: DataSet[LabeledVector] = inputProOrder(inputSample)
       //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
-      var totalNum = labledOrderSample.map { s => 1 }.reduce { _ + _ }
 
       var splitOrder: DataSet[(String, Int, Double, Double)] = partitionOrder(labledOrderSample)
       //splitOrder.writeAsText("/home/hadoop/Desktop/test/splitOrder")
@@ -75,6 +75,9 @@ object WordCount {
     }
 
     inputSample.map { s => s.toList } writeAsText ("/home/hadoop/Desktop/test/inputSample")
+
+    val testErro = testErrCal(inputSample, totalNum)
+    testErro.writeAsText("/home/hadoop/Desktop/test/testErro")
 
     // execute program
     env.execute(" Decision Tree ")
@@ -651,8 +654,8 @@ object WordCount {
   /*
      * test error to measure the algorithm accuracy
      */
-  def testErrCal(inputTo: DataSet[LabeledVector], totalNum: DataSet[Int]): DataSet[Double] = {
-    val real = inputTo.map { s => new Frequency(s.position, s.label, 1) }
+  def testErrCal(inputSample: DataSet[Array[String]], totalNum: DataSet[Int]): DataSet[Double] = {
+    val real = inputSample.map { s => new Frequency(s(0), s(1).toDouble, 1) }
       .groupBy("position", "label").reduce { (s1, s2) => new Frequency(s1.position, s1.label, s1.frequency + s2.frequency) }
     val prediction = real.groupBy("position").reduce { (s1, s2) =>
       var re = new Frequency(s1.position, s1.label, 0)
