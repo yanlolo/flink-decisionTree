@@ -32,7 +32,7 @@ object WordCount {
 
     var inputSample: DataSet[Array[String]] = nonEmptyDatasets.map { s => ("" +: s) }
 
-    for (i <- 1 to numSplit) {
+    for (i <- 1 to numLevel) {
       var labledOrderSample: DataSet[LabeledVector] = inputProOrder(inputSample)
       //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
 
@@ -91,7 +91,7 @@ object WordCount {
   private val numFeature = 2 // number of independent features
   private val numBins = 5 // B bins for Update procedure
   private val numSplit = 3 //By default it should be same as numBins
-  private val numLevel = 3 // how many levels of tree
+  private val numLevel = 1 // how many levels of tree
   private val leastSample = 5 // least number of samples in one node
 
   case class LabeledVector(position: String, label: Double, feature: Array[Double])
