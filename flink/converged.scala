@@ -34,24 +34,23 @@ object WordCount {
     val totalNum = labledSample.map { s => 1 }.reduce { _ + _ }
 
     var result = partition(labledSample)
-    var inputTo: DataSet[LabeledVector] = result._1
-    var split: DataSet[(String, Int, Double, Double)] = result._2
-
-    //    for (i <- 1 to numLevel - 1) {
-    //      result = partition(inputTo)
-    //      inputTo = result._1
-    //      split = split.union(result._2)
-    //    }
-
-    inputTo.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedData")
+    var split: DataSet[(String, Int, Double, Double)] = result
     split.writeAsText("/home/hadoop/Desktop/test/split")
 
-    val testErr = testErrCal(inputTo, totalNum)
-    testErr.writeAsText("/home/hadoop/Desktop/test/testErr")
-
     val labledCateSample: DataSet[LabeledVectorStr] = inputProCate(nonEmptyDatasets)
-    val splitedCateSample: DataSet[LabeledVectorStr] = partitionCate(labledCateSample)
-    splitedCateSample.map { s => (s.position, s.label, s.feature.toList) } writeAsText ("/home/hadoop/Desktop/test/splitedCateSample")
+    val splitedCateSample: DataSet[GainStr] = partitionCate(labledCateSample)
+    splitedCateSample.writeAsText("/home/hadoop/Desktop/test/splitedCateSample")
+
+    val splitPlace = split.join(splitedCateSample).where(0).equalTo("position").map {
+      s =>
+        var re = (0, " ")
+        if (s._1._4 > s._2.gain)
+          re = (s._1._2, s._1._3.toString())
+        else
+          re = (s._2.featureIndex + 14, s._2.featureValue)
+        re
+    }
+    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
 
     // execute program
     env.execute(" Decision Tree ")
@@ -443,7 +442,7 @@ object WordCount {
       .map {
         s => (s._1._1, s._1._2, s._2.uniform(s._1._3), s._1._4)
       }
-    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlaceTest")
+    //splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlaceTest")
 
     splitPlace
   }
@@ -451,7 +450,7 @@ object WordCount {
   /*
    * partition one level
    */
-  def partition(labledSample: DataSet[LabeledVector]): (DataSet[LabeledVector], DataSet[(String, Int, Double, Double)]) = {
+  def partition(labledSample: DataSet[LabeledVector]): DataSet[(String, Int, Double, Double)] = {
     val histoSample: DataSet[Histogram] = labledSample.flatMap { s =>
       (0 until s.feature.size) map {
         index => new Histogram(s.position, s.label, index, Array(Histo(s.feature(index), 1)))
@@ -490,15 +489,16 @@ object WordCount {
     val splitPlace: DataSet[(String, Int, Double, Double)] = findSplitPlace(gain, uniform)
     //splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
 
-    val splitedSample: DataSet[LabeledVector] = labledSample.join(splitPlace).where("position").equalTo(0)
-      .map { s =>
-        if (s._1.feature(s._2._2) < s._2._3)
-          new LabeledVector(s._1.position ++ "L", s._1.label, s._1.feature)
-        else
-          new LabeledVector(s._1.position ++ "R", s._1.label, s._1.feature)
-      }
-    //splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
-    (splitedSample, splitPlace)
+    //    val splitedSample: DataSet[LabeledVector] = labledSample.join(splitPlace).where("position").equalTo(0)
+    //      .map { s =>
+    //        if (s._1.feature(s._2._2) < s._2._3)
+    //          new LabeledVector(s._1.position ++ "L", s._1.label, s._1.feature)
+    //        else
+    //          new LabeledVector(s._1.position ++ "R", s._1.label, s._1.feature)
+    //      }
+    //    //splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
+    //    (splitedSample, splitPlace)
+    splitPlace
   }
 
   /*
@@ -514,7 +514,7 @@ object WordCount {
     labledSample
   }
 
-  def partitionCate(labledSample: DataSet[LabeledVectorStr]): DataSet[LabeledVectorStr] = {
+  def partitionCate(labledSample: DataSet[LabeledVectorStr]): DataSet[GainStr] = {
     val histoSample: DataSet[HistogramStr] = labledSample.flatMap { s =>
       (0 until s.feature.size) map {
         index => new HistogramStr(s.position, s.label, index, s.feature(index), 1)
@@ -633,7 +633,7 @@ object WordCount {
       .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1._4, s._1._5, s._1._6, s._2.frequency) }
       .map { s => new GainStr(s._1, s._2, s._3, s._4 - s._7 * s._5 - (1 - s._7) * s._6) }
 
-    //gainInfo.writeAsText("/home/hadoop/Desktop/test/gainInfo")
+    gainInfo.writeAsText("/home/hadoop/Desktop/test/gainInfoCate")
 
     val splitPlace = gainInfo.groupBy("position").reduce {
       (s1, s2) =>
@@ -644,16 +644,17 @@ object WordCount {
     }
 
     splitPlace.writeAsText("/home/hadoop/Desktop/test/splitCatePlace")
+    splitPlace
 
-    val splitedSample: DataSet[LabeledVectorStr] = labledSample.join(splitPlace).where("position").equalTo("position")
-      .map { s =>
-        if (s._1.feature(s._2.featureIndex) == s._2.featureValue)
-          new LabeledVectorStr(s._1.position ++ "L", s._1.label, s._1.feature)
-        else
-          new LabeledVectorStr(s._1.position ++ "R", s._1.label, s._1.feature)
-      }
-
-    splitedSample
+    //    val splitedSample: DataSet[LabeledVectorStr] = labledSample.join(splitPlace).where("position").equalTo("position")
+    //      .map { s =>
+    //        if (s._1.feature(s._2.featureIndex) == s._2.featureValue)
+    //          new LabeledVectorStr(s._1.position ++ "L", s._1.label, s._1.feature)
+    //        else
+    //          new LabeledVectorStr(s._1.position ++ "R", s._1.label, s._1.feature)
+    //      }
+    //
+    //    splitedSample
   }
 
   /*
