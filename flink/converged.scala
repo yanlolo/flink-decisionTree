@@ -29,19 +29,18 @@ object WordCount {
     val nonEmptyDatasets: DataSet[Array[String]] = datasets.map { s => s.split("\t") }.filter { !_.contains("") }
     //nonEmptyDatasets.map { s => s.toList }.writeAsText("/home/hadoop/Desktop/test/nonEmptyDatasets")
 
-    val labledSample: DataSet[LabeledVector] = inputPro(nonEmptyDatasets)
+    val labledOrderSample: DataSet[LabeledVector] = inputProOrder(nonEmptyDatasets)
     //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
-    val totalNum = labledSample.map { s => 1 }.reduce { _ + _ }
+    val totalNum = labledOrderSample.map { s => 1 }.reduce { _ + _ }
 
-    var result = partition(labledSample)
-    var split: DataSet[(String, Int, Double, Double)] = result
-    split.writeAsText("/home/hadoop/Desktop/test/split")
+    val splitOrder: DataSet[(String, Int, Double, Double)] = partitionOrder(labledOrderSample)
+    splitOrder.writeAsText("/home/hadoop/Desktop/test/splitOrder")
 
-    val labledCateSample: DataSet[LabeledVectorStr] = inputProCate(nonEmptyDatasets)
-    val splitedCateSample: DataSet[GainStr] = partitionCate(labledCateSample)
-    splitedCateSample.writeAsText("/home/hadoop/Desktop/test/splitedCateSample")
+    val labledUnorderSample: DataSet[LabeledVectorStr] = inputProUnorder(nonEmptyDatasets)
+    val splitedUnorderSample: DataSet[GainStr] = partitionUnorder(labledUnorderSample)
+    splitedUnorderSample.writeAsText("/home/hadoop/Desktop/test/splitedUnorderSample")
 
-    val splitPlace = split.join(splitedCateSample).where(0).equalTo("position").map {
+    val splitPlace = splitOrder.join(splitedUnorderSample).where(0).equalTo("position").map {
       s =>
         var re = (0, " ")
         if (s._1._4 > s._2.gain)
@@ -107,7 +106,7 @@ object WordCount {
   /*
    * input data process
    */
-  def inputPro(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVector] = {
+  def inputProOrder(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVector] = {
 
     val nonEmptySample: DataSet[Array[Double]] = nonEmptyDatasets.map { s => s.take(14)
     }.map { s =>
@@ -450,7 +449,7 @@ object WordCount {
   /*
    * partition one level
    */
-  def partition(labledSample: DataSet[LabeledVector]): DataSet[(String, Int, Double, Double)] = {
+  def partitionOrder(labledSample: DataSet[LabeledVector]): DataSet[(String, Int, Double, Double)] = {
     val histoSample: DataSet[Histogram] = labledSample.flatMap { s =>
       (0 until s.feature.size) map {
         index => new Histogram(s.position, s.label, index, Array(Histo(s.feature(index), 1)))
@@ -486,25 +485,17 @@ object WordCount {
     val gain: DataSet[Gain] = gainCal(labledSample, sum)
     //gain.map { s => (s.position, s.featureIndex, s.gain.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
 
+    //position, featureIndex, splitPlace, gain
     val splitPlace: DataSet[(String, Int, Double, Double)] = findSplitPlace(gain, uniform)
     //splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
 
-    //    val splitedSample: DataSet[LabeledVector] = labledSample.join(splitPlace).where("position").equalTo(0)
-    //      .map { s =>
-    //        if (s._1.feature(s._2._2) < s._2._3)
-    //          new LabeledVector(s._1.position ++ "L", s._1.label, s._1.feature)
-    //        else
-    //          new LabeledVector(s._1.position ++ "R", s._1.label, s._1.feature)
-    //      }
-    //    //splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
-    //    (splitedSample, splitPlace)
     splitPlace
   }
 
   /*
    * unordered
    */
-  def inputProCate(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVectorStr] = {
+  def inputProUnorder(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVectorStr] = {
 
     val labledSample: DataSet[LabeledVectorStr] = nonEmptyDatasets.map { s =>
       new LabeledVectorStr("", s(0).toDouble, s.drop(14).take(26))
@@ -514,7 +505,7 @@ object WordCount {
     labledSample
   }
 
-  def partitionCate(labledSample: DataSet[LabeledVectorStr]): DataSet[GainStr] = {
+  def partitionUnorder(labledSample: DataSet[LabeledVectorStr]): DataSet[GainStr] = {
     val histoSample: DataSet[HistogramStr] = labledSample.flatMap { s =>
       (0 until s.feature.size) map {
         index => new HistogramStr(s.position, s.label, index, s.feature(index), 1)
@@ -579,7 +570,6 @@ object WordCount {
       (s1, s2) =>
         new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
     }
-
     //gainLeft.writeAsText("/home/hadoop/Desktop/test/gainLeft")
 
     // gain right
@@ -608,7 +598,6 @@ object WordCount {
       (s1, s2) =>
         new HistogramStr(s1.position, 0, s1.featureIndex, s1.featureValue, s1.frequency + s2.frequency)
     }
-
     //gainRight.writeAsText("/home/hadoop/Desktop/test/gainRight")
 
     //delta
@@ -621,7 +610,6 @@ object WordCount {
     val delta = deltaPre1.cross(deltaPre2).map {
       s => new HistogramStr(s._1.position, 0, s._1.featureIndex, s._1.featureValue, s._1.frequency / s._2)
     }
-
     //delta.writeAsText("/home/hadoop/Desktop/test/delta")
 
     val gainInfo = gain.join(gainLeft).where("position").equalTo("position")
@@ -632,8 +620,7 @@ object WordCount {
       //(1position, 2featureIndex, 3featureValue, 4entropy, 5entropyLeft, 6entropyRight, 7delta )
       .map { s => (s._2.position, s._2.featureIndex, s._2.featureValue, s._1._4, s._1._5, s._1._6, s._2.frequency) }
       .map { s => new GainStr(s._1, s._2, s._3, s._4 - s._7 * s._5 - (1 - s._7) * s._6) }
-
-    gainInfo.writeAsText("/home/hadoop/Desktop/test/gainInfoCate")
+    //gainInfo.writeAsText("/home/hadoop/Desktop/test/gainInfoCate")
 
     val splitPlace = gainInfo.groupBy("position").reduce {
       (s1, s2) =>
@@ -642,19 +629,9 @@ object WordCount {
         else
           s2
     }
+    //splitPlace.writeAsText("/home/hadoop/Desktop/test/splitCatePlace")
 
-    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitCatePlace")
     splitPlace
-
-    //    val splitedSample: DataSet[LabeledVectorStr] = labledSample.join(splitPlace).where("position").equalTo("position")
-    //      .map { s =>
-    //        if (s._1.feature(s._2.featureIndex) == s._2.featureValue)
-    //          new LabeledVectorStr(s._1.position ++ "L", s._1.label, s._1.feature)
-    //        else
-    //          new LabeledVectorStr(s._1.position ++ "R", s._1.label, s._1.feature)
-    //      }
-    //
-    //    splitedSample
   }
 
   /*
