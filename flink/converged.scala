@@ -29,14 +29,16 @@ object WordCount {
     val nonEmptyDatasets: DataSet[Array[String]] = datasets.map { s => s.split("\t") }.filter { !_.contains("") }
     //nonEmptyDatasets.map { s => s.toList }.writeAsText("/home/hadoop/Desktop/test/nonEmptyDatasets")
 
-    val labledOrderSample: DataSet[LabeledVector] = inputProOrder(nonEmptyDatasets)
+    var inputSample: DataSet[Array[String]] = nonEmptyDatasets.map { s => ("" +: s) }
+
+    val labledOrderSample: DataSet[LabeledVector] = inputProOrder(inputSample)
     //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
     val totalNum = labledOrderSample.map { s => 1 }.reduce { _ + _ }
 
     val splitOrder: DataSet[(String, Int, Double, Double)] = partitionOrder(labledOrderSample)
     splitOrder.writeAsText("/home/hadoop/Desktop/test/splitOrder")
 
-    val labledUnorderSample: DataSet[LabeledVectorStr] = inputProUnorder(nonEmptyDatasets)
+    val labledUnorderSample: DataSet[LabeledVectorStr] = inputProUnorder(inputSample)
     val splitedUnorderSample: DataSet[GainStr] = partitionUnorder(labledUnorderSample)
     splitedUnorderSample.writeAsText("/home/hadoop/Desktop/test/splitedUnorderSample")
 
@@ -46,10 +48,28 @@ object WordCount {
         if (s._1._4 > s._2.gain)
           re = (s._1._2, s._1._3.toString())
         else
-          re = (s._2.featureIndex + 14, s._2.featureValue)
+          re = (s._2.featureIndex + 13, s._2.featureValue)
         re
     }
     splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
+
+//    val splitedSample: DataSet[Array[String]] = inputSample.join(splitPlace).where(0).equalTo(0)
+//      .map {
+//        s =>
+//          var re = new Array[String](41)
+//          if (s._2._1 <= 12) {
+//            if (s._1(s._2._1 + 2).toDouble < s._2._2.toDouble)
+//              re = Array(s._1(0) ++ "L") ++ s._1.tail
+//            else
+//              re = (s._1(0) ++ "R") +: s._1.tail
+//          } else {
+//            if (s._1(s._2._1 + 2) == s._2._2)
+//              re = (s._1(0) ++ "L") +: s._1.tail
+//            else
+//              re = (s._1(0) ++ "R") +: s._1.tail
+//          }
+//      }
+//    splitedSample.writeAsText("/home/hadoop/Desktop/test/splitedSample")
 
     // execute program
     env.execute(" Decision Tree ")
@@ -106,24 +126,13 @@ object WordCount {
   /*
    * input data process
    */
-  def inputProOrder(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVector] = {
+  def inputProOrder(inputSample: DataSet[Array[String]]): DataSet[LabeledVector] = {
 
-    val nonEmptySample: DataSet[Array[Double]] = nonEmptyDatasets.map { s => s.take(14)
-    }.map { s =>
-      //var re = new Array[Double](3)
-      var re = new Array[Double](14)
-      var i = 0
-
-      for (aa <- s) {
-        if (i <= 13)
-          re(i) = aa.toDouble
-        i += 1
-      }
-      re
-    }
-
-    val labledSample: DataSet[LabeledVector] = nonEmptySample.map { s =>
-      new LabeledVector("", s(0), s.drop(1).take(13))
+    val labledSample: DataSet[LabeledVector] = inputSample.map { s =>
+      var re = new Array[Double](13)
+      for (i <- 2 to 14)
+        re(i - 2) = s(i).toDouble
+      new LabeledVector(s(0), s(1).toDouble, re)
     }
 
     labledSample
@@ -495,10 +504,10 @@ object WordCount {
   /*
    * unordered
    */
-  def inputProUnorder(nonEmptyDatasets: DataSet[Array[String]]): DataSet[LabeledVectorStr] = {
+  def inputProUnorder(inputSample: DataSet[Array[String]]): DataSet[LabeledVectorStr] = {
 
-    val labledSample: DataSet[LabeledVectorStr] = nonEmptyDatasets.map { s =>
-      new LabeledVectorStr("", s(0).toDouble, s.drop(14).take(26))
+    val labledSample: DataSet[LabeledVectorStr] = inputSample.map { s =>
+      new LabeledVectorStr(s(0), s(1).toDouble, s.drop(15).take(26))
       //new LabeledVectorStr("", s(0).toDouble, s.drop(1).take(2))
     }
 
