@@ -58,11 +58,9 @@ object WordCount {
   // *************************************************************************  
   private var inputPath: String = null
   private var outputPath: String = null
-  private val numFeature = 2 // number of independent features
   private val numBins = 5 // B bins for Update procedure
   private val numSplit = 3 //By default it should be same as numBins
   private val numLevel = 3 // how many levels of tree
-  private val leastSample = 5 // least number of samples in one node
 
   case class LabeledVector(position: String, label: Double, feature: Array[Double])
   case class Histo(featureValue: Double, frequency: Double)
