@@ -27,7 +27,14 @@ object WordCount {
     val input = getDataSet(env)
     val datasets: DataSet[String] = input.flatMap { _.split("\n") } filter { _.nonEmpty }
     val nonEmptyDatasets = datasets.map { s => s.split("\t") }.filter { !_.contains("") }
-      .map { s => (s(0), s(1), s(2), s(3), s(4), s(5), s(6), s(7), s(8), s(9), s(10), s(11), s(12), s(13)) }
+      .map { s =>
+        var re = (" ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ")
+        if (s(0) == "0")
+          re = ("No", s(1), s(2), s(3), s(4), s(5), s(6), s(7), s(8), s(9), s(10), s(11), s(12), s(13))
+        else if (s(0) == "1")
+          re = ("Yes", s(1), s(2), s(3), s(4), s(5), s(6), s(7), s(8), s(9), s(10), s(11), s(12), s(13))
+        re
+      }
     //nonEmptyDatasets.writeAsText("/home/hadoop/Desktop/test/nonEmptyDatasets")
     //.map { s => s.toList }
     nonEmptyDatasets.writeAsCsv("/home/hadoop/Desktop/test/nonEmptyDatasets", "\n", " ")
