@@ -58,9 +58,9 @@ object WordCount {
   // *************************************************************************  
   private var inputPath: String = null
   private var outputPath: String = null
-  private val numBins = 20 // B bins for Update procedure
-  private val numSplit = 20 //By default it should be same as numBins
-  private val numLevel = 1 // how many levels of tree
+  private val numBins = 200 // B bins for Update procedure
+  private val numSplit = 200 //By default it should be same as numBins
+  private val numLevel = 4 // how many levels of tree
 
   case class LabeledVector(position: String, label: Double, feature: Array[Double])
   case class Histo(featureValue: Double, frequency: Double)
@@ -419,18 +419,15 @@ object WordCount {
           }
         }
         (s.position, s.featureIndex, maxIndex, max)
-    }
-    splitPlace1.writeAsText("/home/hadoop/Desktop/test/splitPlace1")
-
-    val splitPlace2 = splitPlace1.groupBy(0).reduce { (s1, s2) =>
+    }.groupBy(0).reduce { (s1, s2) =>
       var re = s1
       if (s1._4 < s2._4)
         re = s2
       re
     }
-    splitPlace2.writeAsText("/home/hadoop/Desktop/test/splitPlace2")
+    //splitPlace1.writeAsText("/home/hadoop/Desktop/test/splitPlace2")
 
-    val splitPlace = splitPlace2.join(uniform).where(0).equalTo("position")
+    val splitPlace = splitPlace1.join(uniform).where(0).equalTo("position")
       .filter { s => (s._2.featureIndex == s._1._2) } // get the matched feature
       .map {
         s => (s._1._1, s._1._2, s._2.uniform(s._1._3))
@@ -447,38 +444,38 @@ object WordCount {
         index => new Histogram(s.position, s.label, index, Array(Histo(s.feature(index), 1)))
       }
     }
-    histoSample.map { s => (s.position, s.label, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/histoSample")
+    //histoSample.map { s => (s.position, s.label, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/histoSample")
 
     val updatedSample: DataSet[Histogram] = histoSample.groupBy("position", "label", "featureIndex") reduce {
       (h1, h2) => updatePro(h1, h2)
     }
-    updatedSample.map { s => (s.position, s.label, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/updatedSample")
+    //updatedSample.map { s => (s.position, s.label, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/updatedSample")
 
     val mergedSample: DataSet[MergedHisto] = updatedSample.map { s => new MergedHisto(s.position, s.featureIndex, s.histo) }
       .groupBy("position", "featureIndex") reduce {
         (m1, m2) => mergePro(m1, m2)
       }
-    mergedSample.map { s => (s.position, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/mergedSample")
+    //mergedSample.map { s => (s.position, s.featureIndex, s.histo.toList) }.writeAsText("/home/hadoop/Desktop/test/mergedSample")
 
     val numSample: DataSet[NumSample] = labledSample.map { s => new NumSample(s.position, 1) }.groupBy(0)
       .reduce { (s1, s2) => new NumSample(s1.position, s1.number + s2.number) }
-    numSample.writeAsText("/home/hadoop/Desktop/test/numSample")
+    // numSample.writeAsText("/home/hadoop/Desktop/test/numSample")
 
     val uniform: DataSet[Uniform] = numSample.join(mergedSample).where("position").equalTo("position")
       .map { sample => uniformPro(sample) }
-    uniform.map { s => (s.position, s.featureIndex, s.uniform.toList) } writeAsText ("/home/hadoop/Desktop/test/uniform")
+    //uniform.map { s => (s.position, s.featureIndex, s.uniform.toList) } writeAsText ("/home/hadoop/Desktop/test/uniform")
 
     val sum: DataSet[Sum] = uniform.join(updatedSample).where("position", "featureIndex").equalTo("position", "featureIndex") {
       (uni, updatedSample, out: Collector[Sum]) =>
         out.collect(sumPro(uni, updatedSample))
     }
-    sum.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) }.writeAsText("/home/hadoop/Desktop/test/sum")
+    //sum.map { s => (s.position, s.label, s.featureIndex, s.sum.toList) }.writeAsText("/home/hadoop/Desktop/test/sum")
 
     val gain: DataSet[Gain] = gainCal(labledSample, sum)
-    gain.map { s => (s.position, s.featureIndex, s.gain.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
+    //gain.map { s => (s.position, s.featureIndex, s.gain.toList) } writeAsText ("/home/hadoop/Desktop/test/gain")
 
     val splitPlace: DataSet[(String, Int, Double)] = findSplitPlace(gain, uniform)
-    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
+    //splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
 
     val splitedSample: DataSet[LabeledVector] = labledSample.join(splitPlace).where("position").equalTo(0)
       .map { s =>
@@ -487,7 +484,7 @@ object WordCount {
         else
           new LabeledVector(s._1.position ++ "R", s._1.label, s._1.feature)
       }
-    splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
+    //splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
     (splitedSample, splitPlace)
   }
 
@@ -497,6 +494,8 @@ object WordCount {
   def testErrCal(inputTo: DataSet[LabeledVector], totalNum: DataSet[Int]): DataSet[Double] = {
     val real = inputTo.map { s => new Frequency(s.position, s.label, 1) }
       .groupBy("position", "label").reduce { (s1, s2) => new Frequency(s1.position, s1.label, s1.frequency + s2.frequency) }
+    // real.writeAsText("/home/hadoop/Desktop/test/real")
+
     val prediction = real.groupBy("position").reduce { (s1, s2) =>
       var re = new Frequency(s1.position, s1.label, 0)
       if (s1.frequency > s2.frequency)
@@ -505,6 +504,8 @@ object WordCount {
         re = new Frequency(s1.position, s2.label, s1.frequency + s2.frequency)
       re
     }
+    //prediction.writeAsText("/home/hadoop/Desktop/test/prediction")
+
     val testErrs = real.join(prediction).where("position").equalTo("position") {
       (real, prediction, out: Collector[Double]) =>
         var count = 0.0
