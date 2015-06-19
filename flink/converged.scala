@@ -431,8 +431,7 @@ object WordCount {
    * find the split place
    */
   def findSplitPlace(gain: DataSet[Gain], uniform: DataSet[Uniform]): DataSet[(String, Int, Double, Double)] = {
-    // (the split feature, the uniform place)
-    val splitPlace1 = gain.map {
+   val splitPlace1 = gain.map {
       s =>
         val feature = s.gain
         var max = Integer.MIN_VALUE.toDouble
@@ -444,21 +443,22 @@ object WordCount {
           }
         }
         (s.position, s.featureIndex, maxIndex, max)
-    }.groupBy(0).reduce { (s1, s2) =>
-      var re = (s1._1, 0, 0, 0.0)
-      if (s1._4 <= s2._4)
-        re = (s1._1, s2._2, s2._3, s2._4)
-      else
-        re = (s1._1, s1._2, s1._3, s1._4)
+    }
+    splitPlace1.writeAsText("/home/hadoop/Desktop/test/splitPlace1")
+
+    val splitPlace2 = splitPlace1.groupBy(0).reduce { (s1, s2) =>
+      var re = s1
+      if (s1._4 < s2._4)
+        re = s2
       re
     }
+    splitPlace2.writeAsText("/home/hadoop/Desktop/test/splitPlace2")
 
-    val splitPlace = splitPlace1.join(uniform).where(0).equalTo("position")
+    val splitPlace = splitPlace2.join(uniform).where(0).equalTo("position")
       .filter { s => (s._2.featureIndex == s._1._2) } // get the matched feature
       .map {
-        s => (s._1._1, s._1._2, s._2.uniform(s._1._3), s._1._4)
+        s => (s._1._1, s._1._2, s._2.uniform(s._1._3))
       }
-    //splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlaceTest")
 
     splitPlace
   }
