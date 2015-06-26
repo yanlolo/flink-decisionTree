@@ -33,20 +33,25 @@ object WordCount {
     //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
     val totalNum = labledSample.map { s => 1 }.reduce { _ + _ }
 
-    var result = partition(labledSample)
-    var inputTo: DataSet[LabeledVector] = result._1
-    var split: DataSet[(String, Int, Double)] = result._2
+    //    var result = partition(labledSample)
+    //    var inputTo: DataSet[LabeledVector] = result._1
+    //    var split: DataSet[(String, Int, Double)] = result._2
 
-    for (i <- 1 to numLevel - 1) {
-      result = partition(inputTo)
-      inputTo = result._1
-      split = split.union(result._2)
+    val splitedSample = labledSample.iterate(numLevel) { iterationInput: DataSet[LabeledVector] =>
+      val result = partition(iterationInput)._1
+      result
     }
+    //    for (i <- 1 to numLevel - 1) {
+    //      result = partition(inputTo)
+    //      inputTo = result._1
+    //      split = split.union(result._2)
+    //    }
 
-    inputTo.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data")
-    split.writeAsText("/home/hadoop/Desktop/test/split")
+    //    inputTo.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data")
+    //    split.writeAsText("/home/hadoop/Desktop/test/split")
 
-    val testErr = testErrCal(inputTo, totalNum)
+    splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data")
+    val testErr = testErrCal(splitedSample, totalNum)
     testErr.writeAsText("/home/hadoop/Desktop/test/testErr")
 
     // execute program
@@ -58,9 +63,9 @@ object WordCount {
   // *************************************************************************  
   private var inputPath: String = null
   private var outputPath: String = null
-  private val numBins = 200 // B bins for Update procedure
-  private val numSplit = 200 //By default it should be same as numBins
-  private val numLevel = 4 // how many levels of tree
+  private val numBins = 20 // B bins for Update procedure
+  private val numSplit = 20 //By default it should be same as numBins
+  private val numLevel = 5 // how many levels of tree
 
   case class LabeledVector(position: String, label: Double, feature: Array[Double])
   case class Histo(featureValue: Double, frequency: Double)
