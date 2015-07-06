@@ -33,24 +33,15 @@ object WordCount {
     //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
     val totalNum = labledSample.map { s => 1 }.reduce { _ + _ }
 
-    //    var result = partition(labledSample)
-    //    var inputTo: DataSet[LabeledVector] = result._1
-    //    var split: DataSet[(String, Int, Double)] = result._2
-
     val splitedSample = labledSample.iterate(numLevel) { iterationInput: DataSet[LabeledVector] =>
       val result = partition(iterationInput)._1
       result
     }
-    //    for (i <- 1 to numLevel - 1) {
-    //      result = partition(inputTo)
-    //      inputTo = result._1
-    //      split = split.union(result._2)
-    //    }
-
-    //    inputTo.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data")
-    //    split.writeAsText("/home/hadoop/Desktop/test/split")
-
     splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data")
+
+    val splitPlace = splitedSample.map { s => new Frequency(s.position, s.label, 1) }.groupBy("position", "label").sum("frequency")
+    splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
+
     val testErr = testErrCal(splitedSample, totalNum)
     testErr.writeAsText("/home/hadoop/Desktop/test/testErr")
 
@@ -485,9 +476,9 @@ object WordCount {
     val splitedSample: DataSet[LabeledVector] = labledSample.join(splitPlace).where("position").equalTo(0)
       .map { s =>
         if (s._1.feature(s._2._2) < s._2._3)
-          new LabeledVector(s._1.position ++ "L", s._1.label, s._1.feature)
+          new LabeledVector(s._1.position ++ (" L " + s._2._2 + " " + s._2._3), s._1.label, s._1.feature)
         else
-          new LabeledVector(s._1.position ++ "R", s._1.label, s._1.feature)
+          new LabeledVector(s._1.position ++ (" R " + s._2._2 + " " + s._2._3), s._1.label, s._1.feature)
       }
     //splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/splitedSample")
     (splitedSample, splitPlace)
