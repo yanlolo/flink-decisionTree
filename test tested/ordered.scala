@@ -33,17 +33,33 @@ object WordCount {
     //labledSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/labledSample")
     val totalNum = labledSample.map { s => 1 }.reduce { _ + _ }
 
-    val splitedSample = labledSample.iterate(numLevel) { iterationInput: DataSet[LabeledVector] =>
+    val splitedSample: DataSet[LabeledVector] = labledSample.iterate(numLevel) { iterationInput: DataSet[LabeledVector] =>
       val result = partition(iterationInput)._1
       result
     }
     splitedSample.map { s => (s.position, s.label, s.feature.toList) }.writeAsText("/home/hadoop/Desktop/test/data")
 
-    val splitPlace = splitedSample.map { s => new Frequency(s.position, s.label, 1) }.groupBy("position", "label").sum("frequency")
+    val splitPlace: DataSet[Frequency] = splitedSample.map { s => new Frequency(s.position, s.label, 1) }.groupBy("position", "label").sum("frequency")
     splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
 
-    val terminalNodeNum = splitPlace.map { s => 1 }.reduce(_ + _)
+    val terminalNodeNum: DataSet[Int] = splitPlace.groupBy("position").reduce {
+      (s1, s2) => new Frequency(s1.position, s1.label, 1)
+    }.map { s => 1 }.reduce(_ + _)
     terminalNodeNum.writeAsText("/home/hadoop/Desktop/test/terminalNodeNum")
+
+    val residualMeanDeviancePre: DataSet[Frequency] = splitPlace.groupBy("position").reduce {
+      (s1, s2) => new Frequency(s1.position, s1.label, s1.frequency + s2.frequency)
+    }
+
+    val residualMeanDeviance: DataSet[Double] = splitPlace.join(residualMeanDeviancePre).where("position").equalTo("position") {
+      (s1, s2, out: Collector[Frequency]) =>
+        out.collect(new Frequency(s1.position, s1.label, -2 * s1.frequency * log(s1.frequency / s2.frequency)))
+    }.reduce {
+      (s1, s2) => new Frequency(s1.position, 0, s1.frequency + s2.frequency)
+    }.cross(totalNum).cross(terminalNodeNum).map {
+      s => s._1._1.frequency / (s._1._2 - s._2)
+    }
+    residualMeanDeviance.writeAsText("/home/hadoop/Desktop/test/residualMeanDeviance")
 
     val testErr = testErrCal(splitedSample, totalNum)
     testErr.writeAsText("/home/hadoop/Desktop/test/testErr")
