@@ -42,6 +42,9 @@ object WordCount {
     val splitPlace = splitedSample.map { s => new Frequency(s.position, s.label, 1) }.groupBy("position", "label").sum("frequency")
     splitPlace.writeAsText("/home/hadoop/Desktop/test/splitPlace")
 
+    val terminalNodeNum = splitPlace.map { s => 1 }.reduce(_ + _)
+    terminalNodeNum.writeAsText("/home/hadoop/Desktop/test/terminalNodeNum")
+
     val testErr = testErrCal(splitedSample, totalNum)
     testErr.writeAsText("/home/hadoop/Desktop/test/testErr")
 
@@ -56,7 +59,7 @@ object WordCount {
   private var outputPath: String = null
   private val numBins = 20 // B bins for Update procedure
   private val numSplit = 20 //By default it should be same as numBins
-  private val numLevel = 5 // how many levels of tree
+  private val numLevel = 1 // how many levels of tree
 
   case class LabeledVector(position: String, label: Double, feature: Array[Double])
   case class Histo(featureValue: Double, frequency: Double)
